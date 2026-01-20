@@ -1,0 +1,20 @@
+.Select-control {
+    background-color: #303030 !important;
+}
+
+.card {
+    border: 1px solid #444;
+}
+
+.DateInput_input {
+    background-color: #303030 !important;
+    color: white !important;
+}
+
+.SingleDatePickerInput {
+    background-color: #303030 !important;
+}
+
+.CalendarDay__selected {
+    background: #375a7f !important;
+}
