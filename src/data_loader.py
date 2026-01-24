@@ -1,6 +1,7 @@
 import json
 from functools import lru_cache
 import pandas as pd
+import math
 
 JSON_PATH = "RA.json"
 
@@ -38,9 +39,7 @@ def get_patient_info(patient_id):
 
 def get_filtered_data(imei: str, metric: str, date_start, date_end, time_start=None, time_end=None):
     """Filtra datos por IMEI, métrica, fechas y opcionalmente horario."""
-    print("estoy filtrando lokooo")
-    _, wearable_df = load_all_data() # me quedo solo con los valores de todas las metricas. 
-                                     # Desestimo la lista de pacientes.
+    _, wearable_df = load_all_data()
 
     mask = ( # Selecciono el imei, la metrica y el rango de tiempo en dias que coincida
              # con lo que ingresa el usuario
@@ -69,33 +68,29 @@ def get_filtered_data(imei: str, metric: str, date_start, date_end, time_start=N
     # Donde haya un gap > 15 min, se inserta NaN para romper la línea en el gráfico
     # Aplicar filtro de gaps: insertar NaN donde hay más de 15 minutos entre datos
     GAP_THRESHOLD_MINUTES = 15
-    if len(df) > 1: #si hay al menos una medicion, entra al if 
-        time_diffs = df["record_datetime"].diff() #diferencia entre uno y el anterior. Primero NaN
-        print("Diferencia de tiempo:", time_diffs)
+    if len(df) > 1:
+        time_diffs = df["record_datetime"].diff()
         gap_threshold = pd.Timedelta(minutes=GAP_THRESHOLD_MINUTES)
         gaps = time_diffs > gap_threshold
-        print("Indx de tiempo mayor a 15min:", gaps)
 
-        if gaps.any(): #gaps recorre toda la serie, si hay ANY que cumpla, entra
-            # Crear todas las filas de gap con los dtypes correctos
-            print("KE TE PASA", len(df[gaps].index))
-            gap_rows = [] #creo una lista
-            for idx in df[gaps].index: #le paso la lista de true y false a df para quedarme con los true
-                gap_rows.append({# va a iterar sobre cada indice de gaps
+        if gaps.any():
+            gap_rows = []
+            for idx in df[gaps].index:
+                gap_rows.append({
                     "record_datetime": pd.to_datetime(df.loc[idx]["record_datetime"] - pd.Timedelta(seconds=1)),
-                    "value": float('nan')  # Usar float('nan') para compatibilidad con dtype numérico
+                    "value": math.nan
                 })
 
             # Crear DataFrame de gaps con dtypes explícitos
-            
             gap_df = pd.DataFrame(gap_rows)
-            # gap_df["record_datetime"] = pd.to_datetime(gap_df["record_datetime"])
-            # gap_df["value"] = gap_df["value"].astype(float)
 
             # Concatenar y reordenar
             df = pd.concat([df, gap_df], ignore_index=True)
             df = df.sort_values("record_datetime").reset_index(drop=True)
 
-    df["ma_15m"] = df["value"].rolling(3, min_periods=1, center=True).mean()
+    # df["ma_15m"] = df["value"].rolling(3, min_periods=1, center=True).mean()
 
-    return df[["record_datetime", "value", "ma_15m"]]
+    # # Asegurar que donde value es NaN, ma_15m también sea NaN (para romper líneas en gráficos)
+    # df.loc[df["value"].isna(), "ma_15m"] = float('nan')
+
+    return df[["record_datetime", "value"]]

@@ -15,7 +15,7 @@ def create_overlaid_figure(data_dict):
         cfg = METRICS[metric]
         fig.add_trace(go.Scatter(
             x=df["record_datetime"],
-            y=df["ma_15m"],
+            y=df["value"],
             name=cfg["name"],
             line=dict(color=cfg["color"], width=2),
             hovertemplate=f"{cfg['name']}: %{{y:.1f}} {cfg['unit']}<extra></extra>"
@@ -54,7 +54,7 @@ def create_subplot_figure(data_dict):
         fig.add_trace(
             go.Scatter(
                 x=df["record_datetime"],
-                y=df["ma_15m"],
+                y=df["value"],
                 name=cfg["name"],
                 line=dict(color=cfg["color"], width=2)
             ),
