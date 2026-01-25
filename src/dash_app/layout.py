@@ -28,7 +28,11 @@ def create_layout():
             id="patient-dropdown",
             options=patient_options,
             value=patient_options[0]["value"] if patient_options else None,
-            clearable=False
+            clearable=False,
+            style={
+                "backgroundColor": "#082e53",
+                "color": "white"
+            }
         ),
 
         html.Div(id="patient-info-card", className="my-3"),
@@ -44,10 +48,28 @@ def create_layout():
         html.Hr(),
 
         html.Label("Hora Inicio"),
-        dcc.Dropdown(id="time-start", options=hour_options, value=0, clearable=False),
+        dcc.Dropdown(
+            id="time-start",
+            options=hour_options,
+            value=0,
+            clearable=False,
+            style={
+                "backgroundColor": "#3C6F55",
+                "color": "white"
+            }
+        ),
 
         html.Label("Hora Fin", className="mt-2"),
-        dcc.Dropdown(id="time-end", options=hour_options, value=23, clearable=False),
+        dcc.Dropdown(
+            id="time-end",
+            options=hour_options,
+            value=23,
+            clearable=False,
+            style={
+                "backgroundColor": "#082e53",
+                "color": "white"
+            }
+        ),
 
         html.Hr(),
 

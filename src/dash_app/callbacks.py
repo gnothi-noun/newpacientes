@@ -41,7 +41,7 @@ def register_callbacks(app):
                 html.P(f"Edad: {age} años", className="mb-1"),
                 html.P(f"Hospital: {info['hospital_id']}", className="mb-0")
             ])
-        ], className="bg-secondary text-white")
+        ], className="bg-transparent text-white")
 
         # Obtener rango de fechas disponible
         _, wearable_df = load_all_data()
@@ -68,7 +68,7 @@ def register_callbacks(app):
     )
     def update_graph(patient_id, date_start, date_end, time_start, time_end, metrics, view_mode):
         if not patient_id or not date_start or not date_end or not metrics:
-            return {}, html.Div("Selecciona paciente, fechas y métricas", className="text-muted")
+            return {}, html.Div("Selecciona paciente, fechas y métricas", className="bg-dark text-white")
 
         info = get_patient_info(patient_id)
         if not info:
@@ -107,7 +107,7 @@ def register_callbacks(app):
                         html.P(f"Max: {s['max']:.1f} {s['unit']}", className="mb-1 small"),
                         html.P(f"Prom: {s['avg']:.1f} {s['unit']}", className="mb-0 small")
                     ], className="p-2")
-                ], className="bg-secondary text-white")
+                ], className="bg-dark text-white")
             ], width=2, className="mb-2") for s in stats
         ])
 

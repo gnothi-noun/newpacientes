@@ -1,5 +1,43 @@
+/* Dropdown control (closed state) */
 .Select-control {
-    background-color: #303030 !important;
+    background-color: #ff8a65 !important;
+    color: white !important;
+    border-color: #ff5252 !important;
+}
+
+/* Dropdown menu (opened state) */
+.Select-menu-outer {
+    background-color: #ff8a65 !important;
+}
+
+.Select-menu {
+    background-color: #ff8a65 !important;
+}
+
+/* Individual dropdown options */
+.Select-option {
+    background-color: #ff8a65 !important;
+    color: white !important;
+}
+
+/* Hovered option */
+.Select-option.is-focused {
+    background-color: #0a3d6b !important;
+}
+
+/* Selected option */
+.Select-option.is-selected {
+    background-color: #0a4d8a !important;
+}
+
+/* Selected value text */
+.Select-value-label {
+    color: white !important;
+}
+
+/* Placeholder text */
+.Select-placeholder {
+    color: rgba(255, 255, 255, 0.6) !important;
 }
 
 .card {
@@ -7,7 +45,7 @@
 }
 
 .DateInput_input {
-    background-color: #303030 !important;
+    background-color: #37474f !important;
     color: white !important;
 }
 
