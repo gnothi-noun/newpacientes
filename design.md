@@ -6,3 +6,6 @@
     - Razonamiento: es apreciable la diferencia de temp, sat, frec y presion cada 5 minutos?
     - Tener en cuenta esto con respecto a lo que se revisa cuando tenga el filtro de los baches de mediciones.
     - Convendria hacer un filtro base que me diga en cuanto se perdio la primer medicion? Es decir, apenas con bache de 10 minutos entre una y la siguiente? 
+
+To do list: 
+- Arreglar cuando selecciono rango dentro del mismo dia 

@@ -1,6 +1,6 @@
 from dash import callback, Output, Input, html
 import dash_bootstrap_components as dbc
-from datetime import datetime
+from datetime import datetime, timedelta
 import sys
 sys.path.insert(0, "/home/pato/Documents/src/ongoing/ro/Pacientes")
 from src.data_loader import get_patient_info, get_filtered_data, load_all_data
@@ -53,7 +53,10 @@ def register_callbacks(app):
         min_date = patient_data["record_datetime"].min().date()
         max_date = patient_data["record_datetime"].max().date()
 
-        return card, min_date, max_date, min_date, min_date, max_date, max_date
+        # Default to most recent 7 days (or all data if less than 7 days available)
+        default_start_date = max(min_date, max_date - timedelta(days=6))
+
+        return card, min_date, max_date, default_start_date, min_date, max_date, max_date
 
     @app.callback(
         Output("main-graph", "figure"),
