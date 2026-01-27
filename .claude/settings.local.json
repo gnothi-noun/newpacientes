@@ -5,7 +5,8 @@
       "Bash(python test_gap_visual.py:*)",
       "Bash(python test_main_gaps.py:*)",
       "Bash(python:*)",
-      "Bash(ls:*)"
+      "Bash(ls:*)",
+      "Bash(timeout 5 tail:*)"
     ]
   }
 }

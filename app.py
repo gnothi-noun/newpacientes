@@ -1,6 +1,3 @@
-import sys
-sys.path.insert(0, "/home/pato/Documents/src/ongoing/ro/Pacientes")
-
 from dash import Dash
 import dash_bootstrap_components as dbc
 from src.dash_app.layout import create_layout

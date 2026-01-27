@@ -1,7 +1,5 @@
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
-import sys
-sys.path.insert(0, "/home/pato/Documents/src/ongoing/ro/Pacientes")
 from src.config import METRICS
 
 

@@ -242,7 +242,7 @@ def convert_dump_to_json(
 
 def main():
     if len(sys.argv) < 2:
-        dump_file = Path(__file__).parent / "residencia_asturiana_completo_20260112_083022.sql"
+        dump_file = Path(__file__).parent / "RA.sql"
     else:
         dump_file = Path(sys.argv[1])
 

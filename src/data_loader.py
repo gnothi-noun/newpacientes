@@ -16,7 +16,12 @@ def load_all_data():
     wearable_df = pd.DataFrame(data["wearabledata"])
 
     # Pre-procesar tipos
-    wearable_df["record_datetime"] = pd.to_datetime(wearable_df["record_datetime"])
+    # Los datos están en UTC, convertimos a hora de Argentina (UTC-3)
+    wearable_df["record_datetime"] = (
+        pd.to_datetime(wearable_df["record_datetime"])
+        .dt.tz_localize("UTC")  # Datos en UTC
+        .dt.tz_convert("America/Argentina/Buenos_Aires")  # Convertir a hora Argentina
+    )
     wearable_df["value"] = pd.to_numeric(wearable_df["value"], errors="coerce")
 
     return patients_df, wearable_df
@@ -41,13 +46,17 @@ def get_filtered_data(imei: str, metric: str, date_start, date_end, time_start=N
     """Filtra datos por IMEI, métrica, fechas y opcionalmente horario."""
     _, wearable_df = load_all_data()
 
+    # Convertir fechas a timezone-aware (Argentina) para comparar correctamente
+    date_start_tz = pd.to_datetime(date_start).tz_localize("America/Argentina/Buenos_Aires")
+    date_end_tz = pd.to_datetime(date_end).tz_localize("America/Argentina/Buenos_Aires") + pd.Timedelta(days=1) - pd.Timedelta(seconds=1)
+
     mask = ( # Selecciono el imei, la metrica y el rango de tiempo en dias que coincida
              # con lo que ingresa el usuario
-        
+
         (wearable_df["imei"] == str(imei)) &
         (wearable_df["metric"] == metric) &
-        (wearable_df["record_datetime"] >= pd.to_datetime(date_start)) &
-        (wearable_df["record_datetime"] <= pd.to_datetime(date_end))
+        (wearable_df["record_datetime"] >= date_start_tz) &
+        (wearable_df["record_datetime"] <= date_end_tz)
     )
 
     df:pd.DataFrame = wearable_df[mask].copy()  # paso la mascara por todos los valores de todas

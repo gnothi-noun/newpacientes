@@ -1,8 +1,6 @@
 from dash import callback, Output, Input, html
 import dash_bootstrap_components as dbc
 from datetime import datetime, timedelta
-import sys
-sys.path.insert(0, "/home/pato/Documents/src/ongoing/ro/Pacientes")
 from src.data_loader import get_patient_info, get_filtered_data, load_all_data
 from src.dash_app.figures import create_overlaid_figure, create_subplot_figure, calculate_stats
 

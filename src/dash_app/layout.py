@@ -1,7 +1,5 @@
 from dash import html, dcc
 import dash_bootstrap_components as dbc
-import sys
-sys.path.insert(0, "/home/pato/Documents/src/ongoing/ro/Pacientes")
 from src.data_loader import get_patient_list
 from src.config import METRICS
 
