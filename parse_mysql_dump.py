@@ -157,8 +157,8 @@ def parse_mysql_dump(filepath: str, verbose: bool = False) -> dict:
         Example: {"users": [{"id": 1, "name": "John"}, ...], "orders": [...]}
     """
     database = {}
-    current_table = None
-    current_columns = []
+    table_columns = {}  # Store columns per table
+    rows_skipped = {}  # Track skipped rows per table
 
     with open(filepath, 'r', encoding='utf-8') as f:
         for line in f:
@@ -170,11 +170,13 @@ def parse_mysql_dump(filepath: str, verbose: bool = False) -> dict:
 
             # Parse CREATE TABLE
             if line_stripped.startswith('CREATE TABLE'):
-                current_table, current_columns = parse_create_table(line, f)
-                if current_table:
-                    database[current_table] = []
+                table_name, columns = parse_create_table(line, f)
+                if table_name:
+                    database[table_name] = []
+                    table_columns[table_name] = columns
+                    rows_skipped[table_name] = 0
                     if verbose:
-                        print(f"Found table: {current_table} with {len(current_columns)} columns", file=sys.stderr)
+                        print(f"Found table: {table_name} with {len(columns)} columns", file=sys.stderr)
 
             # Parse INSERT statements
             elif line_stripped.startswith('INSERT INTO'):
@@ -182,9 +184,26 @@ def parse_mysql_dump(filepath: str, verbose: bool = False) -> dict:
                 match = re.search(r'INSERT INTO `(\w+)`', line_stripped)
                 if match:
                     table_name = match.group(1)
-                    if table_name in database:
-                        for row in extract_insert_data(line, current_columns):
+                    if table_name in database and table_name in table_columns:
+                        rows_before = len(database[table_name])
+                        for row in extract_insert_data(line, table_columns[table_name]):
                             database[table_name].append(row)
+                        rows_after = len(database[table_name])
+                        rows_added = rows_after - rows_before
+
+                        # Estimate total rows in INSERT (rough count of opening parens)
+                        estimated_rows = line.count('),(') + 1
+                        if rows_added < estimated_rows:
+                            skipped = estimated_rows - rows_added
+                            rows_skipped[table_name] += skipped
+                            if verbose:
+                                print(f"Warning: {table_name} - {skipped} rows skipped (column mismatch)", file=sys.stderr)
+
+    if verbose and any(rows_skipped.values()):
+        print("\nRows skipped due to column mismatch:", file=sys.stderr)
+        for table, count in rows_skipped.items():
+            if count > 0:
+                print(f"  {table}: {count} rows", file=sys.stderr)
 
     return database
 

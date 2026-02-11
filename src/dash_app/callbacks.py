@@ -1,12 +1,71 @@
-from dash import callback, Output, Input, html
+from dash import callback, Output, Input, State, html, ALL, ctx
+from dash.exceptions import PreventUpdate
 import dash_bootstrap_components as dbc
 from datetime import datetime, timedelta
-from src.data_loader import get_patient_info, get_filtered_data, load_all_data
+from src.data_loader import (
+    get_patient_info, get_filtered_data, load_all_data,
+    get_patients_summary, get_patients_with_alerts
+)
 from src.dash_app.figures import create_overlaid_figure, create_subplot_figure, calculate_stats
+from src.dash_app.pages.patient_monitor import create_patient_monitor_layout
+from src.dash_app.pages.dashboard import (
+    create_dashboard_layout, create_alerts_panel, create_patients_table
+)
 
 
 def register_callbacks(app):
 
+    # ==================== ROUTING ====================
+    @app.callback(
+        Output('page-content', 'children'),
+        Input('url', 'pathname'),
+        State('selected-patient-store', 'data')
+    )
+    def display_page(pathname, stored_patient_id):
+        if pathname == '/patient':
+            return create_patient_monitor_layout(stored_patient_id)
+        else:  # "/" or any other path -> Dashboard
+            return create_dashboard_layout()
+
+    # ==================== DASHBOARD CALLBACKS ====================
+    @app.callback(
+        Output('alerts-section', 'children'),
+        Output('patients-table-container', 'children'),
+        Input('url', 'pathname')
+    )
+    def update_dashboard(pathname):
+        if pathname != '/' and pathname is not None:
+            raise PreventUpdate
+
+        # Get all patients summary
+        all_patients = get_patients_summary()
+        patients_with_alerts = get_patients_with_alerts()
+
+        # Create components
+        alerts_panel = create_alerts_panel(patients_with_alerts)
+        patients_table = create_patients_table(all_patients)
+
+        return alerts_panel, patients_table
+
+    @app.callback(
+        Output('url', 'pathname', allow_duplicate=True),
+        Output('selected-patient-store', 'data'),
+        Input({'type': 'alert-card', 'patient_id': ALL}, 'n_clicks'),
+        Input({'type': 'patient-row', 'patient_id': ALL}, 'n_clicks'),
+        prevent_initial_call=True
+    )
+    def navigate_to_patient(alert_clicks, row_clicks):
+        if not ctx.triggered_id:
+            raise PreventUpdate
+
+        # Get the patient_id from the triggered component
+        patient_id = ctx.triggered_id.get('patient_id')
+        if patient_id:
+            return '/patient', patient_id
+
+        raise PreventUpdate
+
+    # ==================== PATIENT MONITOR CALLBACKS ====================
     @app.callback(
         Output("patient-info-card", "children"),
         Output("date-start", "min_date_allowed"),
@@ -35,8 +94,8 @@ def register_callbacks(app):
         card = dbc.Card([
             dbc.CardBody([
                 html.P(f"ID: {info['patient_id']}", className="mb-1"),
-                html.P(f"Género: {info['genre'] or 'N/D'}", className="mb-1"),
-                html.P(f"Edad: {age} años", className="mb-1"),
+                html.P(f"Genero: {info['genre'] or 'N/D'}", className="mb-1"),
+                html.P(f"Edad: {age} anos", className="mb-1"),
                 html.P(f"Hospital: {info['hospital_id']}", className="mb-0")
             ])
         ], className="bg-transparent text-white")
@@ -69,7 +128,7 @@ def register_callbacks(app):
     )
     def update_graph(patient_id, date_start, date_end, time_start, time_end, metrics, view_mode):
         if not patient_id or not date_start or not date_end or not metrics:
-            return {}, html.Div("Selecciona paciente, fechas y métricas", className="bg-dark text-white")
+            return {}, html.Div("Selecciona paciente, fechas y metricas", className="bg-dark text-white")
 
         info = get_patient_info(patient_id)
         if not info:
@@ -77,7 +136,7 @@ def register_callbacks(app):
 
         imei = info["imei"]
 
-        # Obtener datos para cada métrica
+        # Obtener datos para cada metrica
         data_dict = {}
         for metric in metrics:
             df = get_filtered_data(imei, metric, date_start, date_end, time_start, time_end)
@@ -88,13 +147,13 @@ def register_callbacks(app):
         if total_points == 0:
             return {}, html.Div("Sin datos para el rango seleccionado", className="text-warning")
 
-        # Generar figura según modo
+        # Generar figura segun modo
         if view_mode == "overlay":
             fig = create_overlaid_figure(data_dict)
         else:
             fig = create_subplot_figure(data_dict)
 
-        # Calcular estadísticas
+        # Calcular estadisticas
         stats = calculate_stats(data_dict)
         if not stats:
             return fig, html.Div()

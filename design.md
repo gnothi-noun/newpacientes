@@ -9,3 +9,4 @@
 
 To do list: 
 - Arreglar cuando selecciono rango dentro del mismo dia 
+- Cuando paso de superpuesto a subplots ok. Cuando quiero volver de subplots a superpuesto, el grafico queda en tamaño de subplots

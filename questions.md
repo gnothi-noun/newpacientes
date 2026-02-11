@@ -8,3 +8,6 @@ La ultima semana no aparecen
 557: le faltan como 3 días, del 1 al 4 de enero. Despues del 5 de enero no hay mas       mediciones
 561: se lo saca todas las noches
 565: tiene datos aislados
+
+8179: no hay datos entre el 19 a las 16:06 hasta 23 a las 21:01
+
