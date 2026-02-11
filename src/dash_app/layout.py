@@ -7,7 +7,7 @@ def create_navbar():
     """Create navigation bar."""
     return dbc.Navbar(
         dbc.Container([
-            dbc.NavbarBrand("VITAICARE", href="/", className="ms-2"),
+            dbc.NavbarBrand("Residencia Asturiana", href="/", className="ms-2"),
             dbc.Nav([
                 dbc.NavItem(dbc.NavLink("Dashboard", href="/", active="exact")),
                 dbc.NavItem(dbc.NavLink("Monitor Paciente", href="/patient", active="exact")),

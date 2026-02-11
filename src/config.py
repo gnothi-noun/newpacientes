@@ -46,14 +46,14 @@ METRICS = {
         "name": "Frecuencia Cardíaca",
         "color": "#FF6B6B",
         "unit": "bpm",
-        "normal_min": 60,
-        "normal_max": 100
+        "normal_min": 50,
+        "normal_max": 120
     },
     "blood_oxygen_saturation": {
         "name": "Saturación O2",
         "color": "#4ECDC4",
         "unit": "%",
-        "normal_min": 95,
+        "normal_min": 70,
         "normal_max": 100
     },
     "systolic_blood_pressure": {
@@ -74,8 +74,8 @@ METRICS = {
         "name": "Temperatura",
         "color": "#FFEAA7",
         "unit": "°C",
-        "normal_min": 36.0,
-        "normal_max": 37.5
+        "normal_min": 35.0,
+        "normal_max": 38.0
     },
     "daily_activity_steps": {
         "name": "Pasos Diarios",
