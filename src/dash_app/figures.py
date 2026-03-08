@@ -3,7 +3,30 @@ from plotly.subplots import make_subplots
 from src.config import METRICS
 
 
-def create_overlaid_figure(data_dict):
+def _add_alarm_marker(fig, alarm_marker, row=None):
+    """Add an alarm marker to a figure."""
+    if not alarm_marker:
+        return
+    cfg = METRICS[alarm_marker["metric_key"]]
+    kwargs = dict(
+        x=[alarm_marker["datetime"]],
+        y=[alarm_marker["value"]],
+        mode="markers+text",
+        marker=dict(size=14, color="red", symbol="x", line=dict(width=2, color="white")),
+        text=[f"Alarma: {alarm_marker['value']:.1f} {cfg['unit']}"],
+        textposition="top center",
+        textfont=dict(color="red", size=12),
+        name="Alarma",
+        showlegend=False,
+        hovertemplate=f"ALARMA<br>{cfg['name']}: %{{y:.1f}} {cfg['unit']}<extra></extra>"
+    )
+    if row is not None:
+        fig.add_trace(go.Scatter(**kwargs), row=row, col=1)
+    else:
+        fig.add_trace(go.Scatter(**kwargs))
+
+
+def create_overlaid_figure(data_dict, alarm_marker=None):
     """Crea figura con métricas superpuestas."""
     fig = go.Figure()
 
@@ -19,6 +42,8 @@ def create_overlaid_figure(data_dict):
             hovertemplate=f"{cfg['name']}: %{{y:.1f}} {cfg['unit']}<extra></extra>"
         ))
 
+    _add_alarm_marker(fig, alarm_marker)
+
     fig.update_layout(
         template="plotly_dark",
         hovermode="x unified",
@@ -31,7 +56,7 @@ def create_overlaid_figure(data_dict):
     return fig
 
 
-def create_subplot_figure(data_dict):
+def create_subplot_figure(data_dict, alarm_marker=None):
     """Crea figura con subplots separados."""
     metrics = [m for m, df in data_dict.items() if not df.empty]
     n = len(metrics)
@@ -59,6 +84,10 @@ def create_subplot_figure(data_dict):
             row=i, col=1
         )
         fig.update_yaxes(title_text=cfg["unit"], row=i, col=1)
+
+        # Add alarm marker to the matching subplot
+        if alarm_marker and alarm_marker["metric_key"] == metric:
+            _add_alarm_marker(fig, alarm_marker, row=i)
 
     fig.update_layout(
         template="plotly_dark",

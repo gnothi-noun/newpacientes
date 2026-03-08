@@ -1,7 +1,6 @@
 """Dashboard page - Overview of all patients with alerts."""
 from dash import html, dcc
 import dash_bootstrap_components as dbc
-from src.data_loader import get_patients_summary, get_patients_with_alerts
 from src.config import METRICS
 
 
@@ -61,20 +60,42 @@ def create_patient_row(patient):
     # Alert indicator
     alert_count = len(patient["alerts"])
     if alert_count > 0:
-        status = html.Span(
+        status = dbc.Button(
             f"{alert_count} alerta(s)",
-            className="badge bg-danger"
+            id={"type": "alert-badge", "patient_id": patient["patient_id"]},
+            color="danger",
+            size="sm",
+            n_clicks=0
         )
     else:
         status = html.Span("OK", className="badge bg-success")
 
     cells.append(html.Td(status, className="align-middle text-center"))
 
+    # Historial button
+    cells.append(html.Td(
+        dbc.Button(
+            "Historial",
+            id={"type": "alarm-history-btn", "patient_id": patient["patient_id"]},
+            color="info",
+            size="sm",
+            n_clicks=0
+        ),
+        className="align-middle text-center"
+    ))
+
     return html.Tr(cells, id={"type": "patient-row", "patient_id": patient["patient_id"]}, style={"cursor": "pointer"})
 
 
 def create_dashboard_layout():
     """Create the main dashboard layout."""
+    # Metric filter options: only metrics with normal ranges
+    metric_options = [{"label": "Todas", "value": "all"}] + [
+        {"label": m["name"], "value": k}
+        for k, m in METRICS.items()
+        if m.get("normal_max") is not None
+    ]
+
     return dbc.Container([
         # Alerts Section
         html.Div(id="alerts-section", className="mb-4"),
@@ -83,7 +104,32 @@ def create_dashboard_layout():
         html.Div([
             html.H4("Resumen de Pacientes", className="mb-3"),
             html.Div(id="patients-table-container")
-        ])
+        ]),
+
+        # Store for alarm history patient ID
+        dcc.Store(id="alarm-history-patient-store"),
+
+        # Alarm History Modal
+        dbc.Modal([
+            dbc.ModalHeader(dbc.ModalTitle(id="alarm-history-modal-title")),
+            dbc.ModalBody([
+                dbc.Row([
+                    dbc.Col([
+                        dbc.Label("Filtrar por metrica:", className="text-white"),
+                        dcc.Dropdown(
+                            id="alarm-history-metric-filter",
+                            options=metric_options,
+                            value="all",
+                            clearable=False,
+                        )
+                    ], width=4)
+                ], className="mb-3"),
+                html.Div(id="alarm-history-table-container")
+            ]),
+            dbc.ModalFooter(
+                dbc.Button("Cerrar", id="alarm-history-close-btn", color="secondary")
+            )
+        ], id="alarm-history-modal", size="xl", is_open=False, scrollable=True)
     ], fluid=True, className="p-4", style={"minHeight": "calc(100vh - 56px)"})
 
 
@@ -124,6 +170,7 @@ def create_patients_table(all_patients):
             html.Th("Temp (C)", className="text-center"),
             html.Th("PA Sist.", className="text-center"),
             html.Th("Estado", className="text-center"),
+            html.Th("Historial", className="text-center"),
         ])),
         html.Tbody(rows)
     ], bordered=True, hover=True, responsive=True, className="table-dark")

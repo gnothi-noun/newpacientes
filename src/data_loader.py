@@ -153,6 +153,7 @@ def get_patients_summary():
             has_alert = False
             alert_type = None
             alert_value = None
+            alert_datetime = None
 
             if normal_min is not None and normal_max is not None:
                 # Find any values outside normal range in the last week
@@ -162,16 +163,19 @@ def get_patients_summary():
                 if not low_alerts.empty:
                     has_alert = True
                     alert_type = "low"
-                    # Get the most recent low alert value
-                    alert_value = low_alerts.loc[low_alerts["record_datetime"].idxmax()]["value"]
+                    low_latest_idx = low_alerts["record_datetime"].idxmax()
+                    alert_value = low_alerts.loc[low_latest_idx]["value"]
+                    alert_datetime = low_alerts.loc[low_latest_idx]["record_datetime"]
 
                 if not high_alerts.empty:
                     has_alert = True
                     alert_type = "high" if alert_type is None else "both"
-                    # Get the most recent high alert value
-                    high_val = high_alerts.loc[high_alerts["record_datetime"].idxmax()]["value"]
+                    high_latest_idx = high_alerts["record_datetime"].idxmax()
+                    high_val = high_alerts.loc[high_latest_idx]["value"]
+                    high_dt = high_alerts.loc[high_latest_idx]["record_datetime"]
                     if alert_value is None or high_alerts["record_datetime"].max() > low_alerts["record_datetime"].max():
                         alert_value = high_val
+                        alert_datetime = high_dt
 
             patient_summary["metrics"][metric_key] = {
                 "latest_value": latest_value,
@@ -187,7 +191,8 @@ def get_patients_summary():
                     "value": alert_value,
                     "unit": metric_cfg["unit"],
                     "type": alert_type,
-                    "color": metric_cfg["color"]
+                    "color": metric_cfg["color"],
+                    "iso_date": alert_datetime.isoformat() if alert_datetime is not None else None
                 })
 
         summary.append(patient_summary)
@@ -199,3 +204,77 @@ def get_patients_with_alerts():
     """Get only patients that have active alerts."""
     summary = get_patients_summary()
     return [p for p in summary if len(p["alerts"]) > 0]
+
+
+def get_patient_alarm_history(patient_id, metric_filter=None):
+    """Get all historical alarms for a patient (all time, not just 7 days).
+
+    Args:
+        patient_id: Patient identifier
+        metric_filter: Optional metric key to filter by (None or "all" = all metrics)
+
+    Returns:
+        List of alarm dicts sorted by date descending
+    """
+    patients_df, wearable_df = load_all_data()
+
+    patient = patients_df[patients_df["patient_id"] == str(patient_id)]
+    if patient.empty:
+        return []
+
+    imei = str(patient.iloc[0]["imei"])
+    patient_data = wearable_df[wearable_df["imei"] == imei]
+
+    if patient_data.empty:
+        return []
+
+    alarms = []
+
+    for metric_key, metric_cfg in METRICS.items():
+        normal_min = metric_cfg.get("normal_min")
+        normal_max = metric_cfg.get("normal_max")
+
+        if normal_min is None or normal_max is None:
+            continue
+
+        if metric_filter and metric_filter != "all" and metric_filter != metric_key:
+            continue
+
+        metric_data = patient_data[patient_data["metric"] == metric_key]
+        if metric_data.empty:
+            continue
+
+        low = metric_data[metric_data["value"] < normal_min]
+        high = metric_data[metric_data["value"] > normal_max]
+
+        for _, row in low.iterrows():
+            alarms.append({
+                "date": row["record_datetime"].strftime("%d/%m/%Y %H:%M"),
+                "iso_date": row["record_datetime"].isoformat(),
+                "sort_date": row["record_datetime"],
+                "metric_name": metric_cfg["name"],
+                "metric_key": metric_key,
+                "value": row["value"],
+                "unit": metric_cfg["unit"],
+                "type": "Bajo",
+            })
+
+        for _, row in high.iterrows():
+            alarms.append({
+                "date": row["record_datetime"].strftime("%d/%m/%Y %H:%M"),
+                "iso_date": row["record_datetime"].isoformat(),
+                "sort_date": row["record_datetime"],
+                "metric_name": metric_cfg["name"],
+                "metric_key": metric_key,
+                "value": row["value"],
+                "unit": metric_cfg["unit"],
+                "type": "Alto",
+            })
+
+    alarms.sort(key=lambda a: a["sort_date"], reverse=True)
+
+    # Remove sort key before returning
+    for a in alarms:
+        del a["sort_date"]
+
+    return alarms

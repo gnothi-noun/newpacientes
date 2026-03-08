@@ -22,3 +22,13 @@ ventana resaltada de todas las metricas mas/menos 2hs.
 - umbrales bien bien definidos?
 - filtrar por tiempo o por cantidad de alertas
 Se deja por tiempo predefinido de una semana.
+
+
+
+Notas a tener en cuenta:
+- Hay que calibrar los relojes. Esto después sirve para validar datos para atrás
+- Meter los eventos marcados. A los clinicos les interesa ver QUE PASO ALGO.
+- Extraemos mucha informacion cuando sabemos a lo largo del día, pulsacion max y min, media, desviaciones, se puede detectar arritmia? cuando fue?
+- Alerta, esta persona hace una variacion de fc de mas de 10% por hora
+
+- Agregar que gladys pueda poner comentarios

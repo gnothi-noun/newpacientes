@@ -1,10 +1,10 @@
-from dash import callback, Output, Input, State, html, ALL, ctx
+from dash import callback, Output, Input, State, html, dcc, ALL, ctx
 from dash.exceptions import PreventUpdate
 import dash_bootstrap_components as dbc
 from datetime import datetime, timedelta
 from src.data_loader import (
     get_patient_info, get_filtered_data, load_all_data,
-    get_patients_summary, get_patients_with_alerts
+    get_patients_summary, get_patients_with_alerts, get_patient_alarm_history
 )
 from src.dash_app.figures import create_overlaid_figure, create_subplot_figure, calculate_stats
 from src.dash_app.pages.patient_monitor import create_patient_monitor_layout
@@ -50,20 +50,44 @@ def register_callbacks(app):
     @app.callback(
         Output('url', 'pathname', allow_duplicate=True),
         Output('selected-patient-store', 'data'),
+        Output('alarm-context-store', 'data', allow_duplicate=True),
         Input({'type': 'alert-card', 'patient_id': ALL}, 'n_clicks'),
+        Input({'type': 'alert-badge', 'patient_id': ALL}, 'n_clicks'),
         Input({'type': 'patient-row', 'patient_id': ALL}, 'n_clicks'),
+        Input({'type': 'alarm-history-btn', 'patient_id': ALL}, 'n_clicks'),
         prevent_initial_call=True
     )
-    def navigate_to_patient(alert_clicks, row_clicks):
+    def navigate_to_patient(alert_clicks, badge_clicks, row_clicks, history_clicks):
         if not ctx.triggered_id:
+            raise PreventUpdate
+
+        # Ignore clicks on alarm-history-btn (handled by modal callback)
+        if isinstance(ctx.triggered_id, dict) and ctx.triggered_id.get('type') == 'alarm-history-btn':
             raise PreventUpdate
 
         # Get the patient_id from the triggered component
         patient_id = ctx.triggered_id.get('patient_id')
-        if patient_id:
-            return '/patient', patient_id
+        if not patient_id:
+            raise PreventUpdate
 
-        raise PreventUpdate
+        # Set alarm context for alert-card and alert-badge clicks
+        alarm_context = {}
+        trigger_type = ctx.triggered_id.get('type') if isinstance(ctx.triggered_id, dict) else None
+        if trigger_type in ('alert-card', 'alert-badge'):
+            patients_with_alerts = get_patients_with_alerts()
+            for p in patients_with_alerts:
+                if str(p["patient_id"]) == str(patient_id) and p["alerts"]:
+                    alert = p["alerts"][0]  # Most critical alert
+                    if alert.get("iso_date"):
+                        alarm_context = {
+                            "patient_id": patient_id,
+                            "iso_date": alert["iso_date"],
+                            "metric_key": alert["metric"],
+                            "value": alert["value"],
+                        }
+                    break
+
+        return '/patient', patient_id, alarm_context
 
     # ==================== PATIENT MONITOR CALLBACKS ====================
     @app.callback(
@@ -74,15 +98,18 @@ def register_callbacks(app):
         Output("date-end", "min_date_allowed"),
         Output("date-end", "max_date_allowed"),
         Output("date-end", "date"),
-        Input("patient-dropdown", "value")
+        Output("metrics-checklist", "value"),
+        Input("patient-dropdown", "value"),
+        Input("alarm-context-store", "data")
     )
-    def update_patient_info(patient_id):
+    def update_patient_info(patient_id, alarm_context):
+        empty = html.Div(), None, None, None, None, None, None, ["heart_rate", "blood_oxygen_saturation"]
         if not patient_id:
-            return html.Div(), None, None, None, None, None, None
+            return empty
 
         info = get_patient_info(patient_id)
         if not info:
-            return html.Div("Paciente no encontrado"), None, None, None, None, None, None
+            return html.Div("Paciente no encontrado"), None, None, None, None, None, None, ["heart_rate", "blood_oxygen_saturation"]
 
         # Calcular edad
         try:
@@ -105,15 +132,26 @@ def register_callbacks(app):
         patient_data = wearable_df[wearable_df["imei"] == str(info["imei"])]
 
         if patient_data.empty:
-            return card, None, None, None, None, None, None
+            return card, None, None, None, None, None, None, ["heart_rate", "blood_oxygen_saturation"]
 
         min_date = patient_data["record_datetime"].min().date()
         max_date = patient_data["record_datetime"].max().date()
 
-        # Default to most recent 7 days (or all data if less than 7 days available)
-        default_start_date = max(min_date, max_date - timedelta(days=6))
+        # Check if coming from an alarm click
+        default_metrics = ["heart_rate", "blood_oxygen_saturation"]
+        print(f"[DEBUG update_patient_info] alarm_context={alarm_context}, patient_id={patient_id}")
+        if alarm_context and str(alarm_context.get("patient_id")) == str(patient_id):
+            # Set date range to the alarm's day
+            alarm_dt = datetime.fromisoformat(alarm_context["iso_date"])
+            default_start_date = alarm_dt.date()
+            default_end_date = alarm_dt.date()
+            default_metrics = [alarm_context["metric_key"]]
+        else:
+            # Default to most recent 7 days
+            default_start_date = max(min_date, max_date - timedelta(days=6))
+            default_end_date = max_date
 
-        return card, min_date, max_date, default_start_date, min_date, max_date, max_date
+        return card, min_date, max_date, default_start_date, min_date, max_date, default_end_date, default_metrics
 
     @app.callback(
         Output("main-graph", "figure"),
@@ -124,9 +162,10 @@ def register_callbacks(app):
         Input("time-start", "value"),
         Input("time-end", "value"),
         Input("metrics-checklist", "value"),
-        Input("view-mode", "value")
+        Input("view-mode", "value"),
+        Input("alarm-context-store", "data")
     )
-    def update_graph(patient_id, date_start, date_end, time_start, time_end, metrics, view_mode):
+    def update_graph(patient_id, date_start, date_end, time_start, time_end, metrics, view_mode, alarm_context):
         if not patient_id or not date_start or not date_end or not metrics:
             return {}, html.Div("Selecciona paciente, fechas y metricas", className="bg-dark text-white")
 
@@ -147,11 +186,22 @@ def register_callbacks(app):
         if total_points == 0:
             return {}, html.Div("Sin datos para el rango seleccionado", className="text-warning")
 
+        # Build alarm marker if context matches
+        alarm_marker = None
+        if (alarm_context
+                and str(alarm_context.get("patient_id")) == str(patient_id)
+                and alarm_context.get("metric_key") in metrics):
+            alarm_marker = {
+                "datetime": alarm_context["iso_date"],
+                "value": alarm_context["value"],
+                "metric_key": alarm_context["metric_key"],
+            }
+
         # Generar figura segun modo
         if view_mode == "overlay":
-            fig = create_overlaid_figure(data_dict)
+            fig = create_overlaid_figure(data_dict, alarm_marker=alarm_marker)
         else:
-            fig = create_subplot_figure(data_dict)
+            fig = create_subplot_figure(data_dict, alarm_marker=alarm_marker)
 
         # Calcular estadisticas
         stats = calculate_stats(data_dict)
@@ -172,3 +222,121 @@ def register_callbacks(app):
         ])
 
         return fig, stats_content
+
+    # ==================== ALARM HISTORY MODAL CALLBACKS ====================
+    @app.callback(
+        Output("alarm-history-modal", "is_open"),
+        Output("alarm-history-patient-store", "data"),
+        Output("alarm-history-modal-title", "children"),
+        Output("alarm-history-metric-filter", "value"),
+        Input({"type": "alarm-history-btn", "patient_id": ALL}, "n_clicks"),
+        Input("alarm-history-close-btn", "n_clicks"),
+        State("alarm-history-modal", "is_open"),
+        prevent_initial_call=True
+    )
+    def toggle_alarm_history_modal(btn_clicks, close_click, is_open):
+        trigger = ctx.triggered_id
+
+        if trigger == "alarm-history-close-btn":
+            return False, None, "", "all"
+
+        if isinstance(trigger, dict) and trigger.get("type") == "alarm-history-btn":
+            if any(c and c > 0 for c in btn_clicks):
+                patient_id = trigger["patient_id"]
+                return True, patient_id, f"Historial de Alarmas - Paciente {patient_id}", "all"
+
+        raise PreventUpdate
+
+    @app.callback(
+        Output("alarm-history-table-container", "children"),
+        Input("alarm-history-patient-store", "data"),
+        Input("alarm-history-metric-filter", "value"),
+        prevent_initial_call=True
+    )
+    def populate_alarm_history(patient_id, metric_filter):
+        if not patient_id:
+            raise PreventUpdate
+
+        alarms = get_patient_alarm_history(patient_id, metric_filter)
+
+        if not alarms:
+            return dbc.Alert(
+                "No se encontraron alarmas para este paciente.",
+                color="info",
+                className="text-center"
+            )
+
+        rows = []
+        for i, a in enumerate(alarms):
+            badge_color = "danger" if a["type"] == "Alto" else "warning"
+            rows.append(html.Tr([
+                html.Td(a["date"]),
+                html.Td(a["metric_name"]),
+                html.Td(f"{a['value']:.1f} {a['unit']}"),
+                html.Td(html.Span(a["type"], className=f"badge bg-{badge_color}")),
+                html.Td(dbc.Button(
+                    "Ver",
+                    id={"type": "alarm-row-btn", "index": i},
+                    color="outline-light",
+                    size="sm",
+                ))
+            ]))
+
+        # Store alarm data for lookup when clicking "Ver"
+        alarm_store = dcc.Store(
+            id="alarm-list-store",
+            data=[{
+                "iso_date": a["iso_date"],
+                "metric_key": a["metric_key"],
+                "value": a["value"],
+            } for a in alarms]
+        )
+
+        table = dbc.Table([
+            html.Thead(html.Tr([
+                html.Th("Fecha"),
+                html.Th("Metrica"),
+                html.Th("Valor"),
+                html.Th("Tipo"),
+                html.Th(""),
+            ])),
+            html.Tbody(rows)
+        ], bordered=True, hover=True, responsive=True, className="table-dark", size="sm")
+
+        return html.Div([
+            alarm_store,
+            html.Small(
+                f"{len(alarms)} alarma(s) encontrada(s)",
+                className="text-muted mb-2 d-block"
+            ),
+            table
+        ])
+
+    # ==================== ALARM ROW CLICK -> NAVIGATE ====================
+    @app.callback(
+        Output("alarm-history-modal", "is_open", allow_duplicate=True),
+        Output("alarm-context-store", "data"),
+        Output("url", "pathname", allow_duplicate=True),
+        Output("selected-patient-store", "data", allow_duplicate=True),
+        Input({"type": "alarm-row-btn", "index": ALL}, "n_clicks"),
+        State("alarm-list-store", "data"),
+        State("alarm-history-patient-store", "data"),
+        prevent_initial_call=True
+    )
+    def navigate_from_alarm(btn_clicks, alarm_list, patient_id):
+        if not ctx.triggered_id or not any(c and c > 0 for c in btn_clicks):
+            raise PreventUpdate
+
+        index = ctx.triggered_id["index"]
+        if not alarm_list or index >= len(alarm_list):
+            raise PreventUpdate
+
+        alarm = alarm_list[index]
+        alarm_context = {
+            "patient_id": patient_id,
+            "iso_date": alarm["iso_date"],
+            "metric_key": alarm["metric_key"],
+            "value": alarm["value"],
+        }
+
+        return False, alarm_context, "/patient", patient_id

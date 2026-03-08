@@ -24,6 +24,7 @@ def create_layout():
     return html.Div([
         dcc.Location(id='url', refresh=False),
         dcc.Store(id='selected-patient-store', storage_type='session'),
+        dcc.Store(id='alarm-context-store', storage_type='session'),
         create_navbar(),
         html.Div(id='page-content', className="bg-dark", style={"minHeight": "calc(100vh - 56px)"})
     ], className="bg-dark")
