@@ -206,12 +206,13 @@ def get_patients_with_alerts():
     return [p for p in summary if len(p["alerts"]) > 0]
 
 
-def get_patient_alarm_history(patient_id, metric_filter=None):
-    """Get all historical alarms for a patient (all time, not just 7 days).
+def get_patient_alarm_history(patient_id, metric_filter=None, days=None):
+    """Get historical alarms for a patient.
 
     Args:
         patient_id: Patient identifier
         metric_filter: Optional metric key to filter by (None or "all" = all metrics)
+        days: Optional number of days to look back from now (None = all time)
 
     Returns:
         List of alarm dicts sorted by date descending
@@ -224,6 +225,14 @@ def get_patient_alarm_history(patient_id, metric_filter=None):
 
     imei = str(patient.iloc[0]["imei"])
     patient_data = wearable_df[wearable_df["imei"] == imei]
+
+    if patient_data.empty:
+        return []
+
+    # Filter by time window if specified
+    if days is not None:
+        cutoff = pd.Timestamp.now(tz="America/Argentina/Buenos_Aires") - pd.Timedelta(days=days)
+        patient_data = patient_data[patient_data["record_datetime"] >= cutoff]
 
     if patient_data.empty:
         return []

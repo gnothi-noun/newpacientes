@@ -229,6 +229,7 @@ def register_callbacks(app):
         Output("alarm-history-patient-store", "data"),
         Output("alarm-history-modal-title", "children"),
         Output("alarm-history-metric-filter", "value"),
+        Output("alarm-history-weeks-store", "data"),
         Input({"type": "alarm-history-btn", "patient_id": ALL}, "n_clicks"),
         Input("alarm-history-close-btn", "n_clicks"),
         State("alarm-history-modal", "is_open"),
@@ -238,33 +239,50 @@ def register_callbacks(app):
         trigger = ctx.triggered_id
 
         if trigger == "alarm-history-close-btn":
-            return False, None, "", "all"
+            return False, None, "", "all", 2
 
         if isinstance(trigger, dict) and trigger.get("type") == "alarm-history-btn":
             if any(c and c > 0 for c in btn_clicks):
                 patient_id = trigger["patient_id"]
-                return True, patient_id, f"Historial de Alarmas - Paciente {patient_id}", "all"
+                return True, patient_id, f"Historial de Alarmas - Paciente {patient_id}", "all", 2
 
         raise PreventUpdate
 
+    # Load more weeks callback
     @app.callback(
-        Output("alarm-history-table-container", "children"),
-        Input("alarm-history-patient-store", "data"),
-        Input("alarm-history-metric-filter", "value"),
+        Output("alarm-history-weeks-store", "data", allow_duplicate=True),
+        Input("alarm-history-load-more-btn", "n_clicks"),
+        State("alarm-history-weeks-store", "data"),
         prevent_initial_call=True
     )
-    def populate_alarm_history(patient_id, metric_filter):
+    def load_more_weeks(n_clicks, current_weeks):
+        if not n_clicks:
+            raise PreventUpdate
+        return (current_weeks or 2) + 1
+
+    @app.callback(
+        Output("alarm-history-table-container", "children"),
+        Output("alarm-history-load-more-container", "style"),
+        Input("alarm-history-patient-store", "data"),
+        Input("alarm-history-metric-filter", "value"),
+        Input("alarm-history-weeks-store", "data"),
+        prevent_initial_call=True
+    )
+    def populate_alarm_history(patient_id, metric_filter, weeks):
         if not patient_id:
             raise PreventUpdate
 
-        alarms = get_patient_alarm_history(patient_id, metric_filter)
+        weeks = weeks or 2
+        days = weeks * 7
+        alarms = get_patient_alarm_history(patient_id, metric_filter, days=days)
+        all_alarms = get_patient_alarm_history(patient_id, metric_filter)
 
         if not alarms:
             return dbc.Alert(
-                "No se encontraron alarmas para este paciente.",
+                f"No se encontraron alarmas en las ultimas {weeks} semanas.",
                 color="info",
                 className="text-center"
-            )
+            ), {"display": "block"} if len(all_alarms) > 0 else {"display": "none"}
 
         rows = []
         for i, a in enumerate(alarms):
@@ -303,14 +321,19 @@ def register_callbacks(app):
             html.Tbody(rows)
         ], bordered=True, hover=True, responsive=True, className="table-dark", size="sm")
 
+        # Hide "load more" if all alarms are already shown
+        has_more = len(alarms) < len(all_alarms)
+        load_more_style = {"display": "block"} if has_more else {"display": "none"}
+
         return html.Div([
             alarm_store,
             html.Small(
-                f"{len(alarms)} alarma(s) encontrada(s)",
+                f"{len(alarms)} alarma(s) en las ultimas {weeks} semanas"
+                + (f" (de {len(all_alarms)} totales)" if has_more else " (todas)"),
                 className="text-muted mb-2 d-block"
             ),
             table
-        ])
+        ]), load_more_style
 
     # ==================== ALARM ROW CLICK -> NAVIGATE ====================
     @app.callback(

@@ -74,7 +74,7 @@ METRICS = {
         "name": "Temperatura",
         "color": "#FFEAA7",
         "unit": "°C",
-        "normal_min": 35.0,
+        "normal_min": 30.0,
         "normal_max": 38.0
     },
     "daily_activity_steps": {

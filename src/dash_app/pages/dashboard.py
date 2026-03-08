@@ -106,8 +106,9 @@ def create_dashboard_layout():
             html.Div(id="patients-table-container")
         ]),
 
-        # Store for alarm history patient ID
+        # Stores for alarm history
         dcc.Store(id="alarm-history-patient-store"),
+        dcc.Store(id="alarm-history-weeks-store", data=2),
 
         # Alarm History Modal
         dbc.Modal([
@@ -124,7 +125,16 @@ def create_dashboard_layout():
                         )
                     ], width=4)
                 ], className="mb-3"),
-                html.Div(id="alarm-history-table-container")
+                html.Div(id="alarm-history-table-container"),
+                html.Div(
+                    dbc.Button(
+                        "Cargar semana anterior",
+                        id="alarm-history-load-more-btn",
+                        color="outline-info",
+                        className="mt-3 w-100"
+                    ),
+                    id="alarm-history-load-more-container"
+                )
             ]),
             dbc.ModalFooter(
                 dbc.Button("Cerrar", id="alarm-history-close-btn", color="secondary")

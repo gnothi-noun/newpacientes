@@ -102,12 +102,12 @@ def create_patient_monitor_layout(selected_patient_id=None):
     ], width=3, className="bg-dark p-3", style={"height": "calc(100vh - 56px)", "overflowY": "auto"})
 
     main_content = dbc.Col([
+        html.Div(id="stats-panel", className="mb-3"),
         dcc.Loading(
             id="loading",
             type="circle",
             children=[
                 dcc.Graph(id="main-graph", style={"height": "65vh"}),
-                html.Div(id="stats-panel", className="mt-3")
             ]
         )
     ], width=9, className="p-3")
