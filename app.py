@@ -4,7 +4,7 @@ from src.dash_app.layout import create_layout
 from src.dash_app.callbacks import register_callbacks
 from src.data_loader import load_all_data
 
-# Pre-cargar datos
+# Pre cargo datos
 print("Cargando datos...")
 load_all_data()
 print("Datos cargados.")
