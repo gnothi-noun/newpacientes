@@ -1,17 +1,17 @@
 """Dashboard page - Overview of all patients with alerts."""
+from __future__ import annotations
 from dash import html, dcc
 import dash_bootstrap_components as dbc
-from src.config import METRICS
+from src.config import METRICS, Alarm
 
 
-def create_alert_card(patient):
+def create_alert_card(patient: dict) -> dbc.Card | None:
     """Create an alert card for a patient with alerts."""
-    alerts = patient["alerts"]
+    alerts: list[Alarm] = patient["alerts"]
     if not alerts:
         return None
 
-    # Get the most critical alert (first one)
-    main_alert = alerts[0]
+    main_alert: Alarm = alerts[0]
 
     return dbc.Card([
         dbc.CardHeader([
@@ -19,12 +19,12 @@ def create_alert_card(patient):
         ], className="bg-danger"),
         dbc.CardBody([
             html.Div([
-                html.Span(f"{main_alert['value']:.1f}", className="display-6 text-danger"),
-                html.Span(f" {main_alert['unit']}", className="text-muted")
+                html.Span(f"{main_alert.value:.1f}", className="display-6 text-danger"),
+                html.Span(f" {main_alert.unit}", className="text-muted")
             ]),
-            html.P(main_alert['metric_name'], className="mb-1"),
+            html.P(main_alert.metric_name, className="mb-1"),
             html.Small(
-                f"{'Bajo' if main_alert['type'] == 'low' else 'Alto'} - Fuera de rango normal",
+                f"{main_alert.alert_type.display_name} - Fuera de rango normal",
                 className="text-muted"
             ),
             html.Hr(className="my-2"),
@@ -33,7 +33,7 @@ def create_alert_card(patient):
     ], className="h-100", style={"cursor": "pointer"}, id={"type": "alert-card", "patient_id": patient["patient_id"]})
 
 
-def create_patient_row(patient):
+def create_patient_row(patient: dict) -> html.Tr:
     """Create a table row for a patient."""
     cells = [
         html.Td(patient["patient_id"], className="align-middle"),
@@ -143,7 +143,7 @@ def create_dashboard_layout():
     ], fluid=True, className="p-4", style={"minHeight": "calc(100vh - 56px)"})
 
 
-def create_alerts_panel(patients_with_alerts):
+def create_alerts_panel(patients_with_alerts: list[dict]):
     """Create the alerts panel with patient cards."""
     if not patients_with_alerts:
         return dbc.Alert(
@@ -167,7 +167,7 @@ def create_alerts_panel(patients_with_alerts):
     ])
 
 
-def create_patients_table(all_patients):
+def create_patients_table(all_patients: list[dict]) -> dbc.Table:
     """Create the summary table for all patients."""
     rows = [create_patient_row(p) for p in all_patients]
 

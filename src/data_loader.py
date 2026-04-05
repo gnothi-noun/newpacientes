@@ -1,9 +1,10 @@
+from __future__ import annotations
 import json
 from functools import lru_cache
 from datetime import datetime, timedelta
 import pandas as pd
 import math
-from src.config import METRICS
+from src.config import METRICS, Alarm, AlertType
 
 JSON_PATH = "RA.json"
 
@@ -29,13 +30,13 @@ def load_all_data():
     return patients_df, wearable_df
 
 
-def get_patient_list():
+def get_patient_list() -> pd.DataFrame:
     """Retorna lista de pacientes para el dropdown."""
     patients_df, _ = load_all_data()
     return patients_df[["patient_id", "imei", "genre", "date_of_birth", "hospital_id"]]
 
 
-def get_patient_info(patient_id):
+def get_patient_info(patient_id: str) -> dict | None:
     """Retorna info de un paciente específico."""
     patients_df, _ = load_all_data()
     patient = patients_df[patients_df["patient_id"] == str(patient_id)]
@@ -102,27 +103,25 @@ def get_filtered_data(imei: str, metric: str, date_start, date_end, time_start=N
     return df[["record_datetime", "value"]]
 
 
-def get_patients_summary():
+def get_patients_summary() -> list[dict]:
     """Get summary of all patients with their latest values and alert status."""
     patients_df, wearable_df = load_all_data()
 
-    # Time window: last 7 days
     now = pd.Timestamp.now(tz="America/Argentina/Buenos_Aires")
     week_ago = now - pd.Timedelta(days=7)
 
-    summary = []
+    summary: list[dict] = []
 
     for _, patient in patients_df.iterrows():
         patient_id = patient["patient_id"]
         imei = str(patient["imei"])
 
-        # Get data for this patient in the last 7 days
         patient_data = wearable_df[
             (wearable_df["imei"] == imei) &
             (wearable_df["record_datetime"] >= week_ago)
         ]
 
-        patient_summary = {
+        patient_summary: dict = {
             "patient_id": patient_id,
             "imei": imei,
             "genre": patient.get("genre", ""),
@@ -130,7 +129,6 @@ def get_patients_summary():
             "metrics": {}
         }
 
-        # Check each metric
         for metric_key, metric_cfg in METRICS.items():
             metric_data = patient_data[patient_data["metric"] == metric_key]
 
@@ -142,34 +140,31 @@ def get_patients_summary():
                 }
                 continue
 
-            # Get latest value
             latest_row = metric_data.loc[metric_data["record_datetime"].idxmax()]
             latest_value = latest_row["value"]
 
-            # Check for alerts (values outside normal range)
             normal_min = metric_cfg.get("normal_min")
             normal_max = metric_cfg.get("normal_max")
 
             has_alert = False
-            alert_type = None
-            alert_value = None
+            alert_type: AlertType | None = None
+            alert_value: float | None = None
             alert_datetime = None
 
             if normal_min is not None and normal_max is not None:
-                # Find any values outside normal range in the last week
                 low_alerts = metric_data[metric_data["value"] < normal_min]
                 high_alerts = metric_data[metric_data["value"] > normal_max]
 
                 if not low_alerts.empty:
                     has_alert = True
-                    alert_type = "low"
+                    alert_type = AlertType.LOW
                     low_latest_idx = low_alerts["record_datetime"].idxmax()
                     alert_value = low_alerts.loc[low_latest_idx]["value"]
                     alert_datetime = low_alerts.loc[low_latest_idx]["record_datetime"]
 
                 if not high_alerts.empty:
                     has_alert = True
-                    alert_type = "high" if alert_type is None else "both"
+                    alert_type = AlertType.HIGH if alert_type is None else AlertType.BOTH
                     high_latest_idx = high_alerts["record_datetime"].idxmax()
                     high_val = high_alerts.loc[high_latest_idx]["value"]
                     high_dt = high_alerts.loc[high_latest_idx]["record_datetime"]
@@ -184,39 +179,36 @@ def get_patients_summary():
                 "alert_value": alert_value
             }
 
-            if has_alert:
-                patient_summary["alerts"].append({
-                    "metric": metric_key,
-                    "metric_name": metric_cfg["name"],
-                    "value": alert_value,
-                    "unit": metric_cfg["unit"],
-                    "type": alert_type,
-                    "color": metric_cfg["color"],
-                    "iso_date": alert_datetime.isoformat() if alert_datetime is not None else None
-                })
+            if has_alert and alert_value is not None and alert_datetime is not None:
+                alarm = Alarm(
+                    patient_id=patient_id,
+                    metric_key=metric_key,
+                    value=alert_value,
+                    timestamp=alert_datetime.to_pydatetime(),
+                    alert_type=alert_type,
+                    metric_name=metric_cfg["name"],
+                    unit=metric_cfg["unit"],
+                    color=metric_cfg["color"],
+                )
+                patient_summary["alerts"].append(alarm)
 
         summary.append(patient_summary)
 
     return summary
 
 
-def get_patients_with_alerts():
+def get_patients_with_alerts() -> list[dict]:
     """Get only patients that have active alerts."""
     summary = get_patients_summary()
     return [p for p in summary if len(p["alerts"]) > 0]
 
 
-def get_patient_alarm_history(patient_id, metric_filter=None, days=None):
-    """Get historical alarms for a patient.
-
-    Args:
-        patient_id: Patient identifier
-        metric_filter: Optional metric key to filter by (None or "all" = all metrics)
-        days: Optional number of days to look back from now (None = all time)
-
-    Returns:
-        List of alarm dicts sorted by date descending
-    """
+def get_patient_alarm_history(
+    patient_id: str,
+    metric_filter: str | None = None,
+    days: int | None = None,
+) -> list[Alarm]:
+    """Get historical alarms for a patient, sorted by timestamp descending."""
     patients_df, wearable_df = load_all_data()
 
     patient = patients_df[patients_df["patient_id"] == str(patient_id)]
@@ -229,7 +221,6 @@ def get_patient_alarm_history(patient_id, metric_filter=None, days=None):
     if patient_data.empty:
         return []
 
-    # Filter by time window if specified
     if days is not None:
         cutoff = pd.Timestamp.now(tz="America/Argentina/Buenos_Aires") - pd.Timedelta(days=days)
         patient_data = patient_data[patient_data["record_datetime"] >= cutoff]
@@ -237,7 +228,7 @@ def get_patient_alarm_history(patient_id, metric_filter=None, days=None):
     if patient_data.empty:
         return []
 
-    alarms = []
+    alarms: list[Alarm] = []
 
     for metric_key, metric_cfg in METRICS.items():
         normal_min = metric_cfg.get("normal_min")
@@ -257,33 +248,10 @@ def get_patient_alarm_history(patient_id, metric_filter=None, days=None):
         high = metric_data[metric_data["value"] > normal_max]
 
         for _, row in low.iterrows():
-            alarms.append({
-                "date": row["record_datetime"].strftime("%d/%m/%Y %H:%M"),
-                "iso_date": row["record_datetime"].isoformat(),
-                "sort_date": row["record_datetime"],
-                "metric_name": metric_cfg["name"],
-                "metric_key": metric_key,
-                "value": row["value"],
-                "unit": metric_cfg["unit"],
-                "type": "Bajo",
-            })
+            alarms.append(Alarm.from_row(str(patient_id), metric_key, row, AlertType.LOW))
 
         for _, row in high.iterrows():
-            alarms.append({
-                "date": row["record_datetime"].strftime("%d/%m/%Y %H:%M"),
-                "iso_date": row["record_datetime"].isoformat(),
-                "sort_date": row["record_datetime"],
-                "metric_name": metric_cfg["name"],
-                "metric_key": metric_key,
-                "value": row["value"],
-                "unit": metric_cfg["unit"],
-                "type": "Alto",
-            })
+            alarms.append(Alarm.from_row(str(patient_id), metric_key, row, AlertType.HIGH))
 
-    alarms.sort(key=lambda a: a["sort_date"], reverse=True)
-
-    # Remove sort key before returning
-    for a in alarms:
-        del a["sort_date"]
-
+    alarms.sort(key=lambda a: a.timestamp, reverse=True)
     return alarms

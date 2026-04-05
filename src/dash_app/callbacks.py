@@ -2,6 +2,7 @@ from dash import callback, Output, Input, State, html, dcc, ALL, ctx
 from dash.exceptions import PreventUpdate
 import dash_bootstrap_components as dbc
 from datetime import datetime, timedelta
+from src.config import Alarm, AlertType
 from src.data_loader import (
     get_patient_info, get_filtered_data, load_all_data,
     get_patients_summary, get_patients_with_alerts, get_patient_alarm_history
@@ -77,14 +78,8 @@ def register_callbacks(app):
             patients_with_alerts = get_patients_with_alerts()
             for p in patients_with_alerts:
                 if str(p["patient_id"]) == str(patient_id) and p["alerts"]:
-                    alert = p["alerts"][0]  # Most critical alert
-                    if alert.get("iso_date"):
-                        alarm_context = {
-                            "patient_id": patient_id,
-                            "iso_date": alert["iso_date"],
-                            "metric_key": alert["metric"],
-                            "value": alert["value"],
-                        }
+                    alarm: Alarm = p["alerts"][0]
+                    alarm_context = alarm.to_context()
                     break
 
         return '/patient', patient_id, alarm_context
@@ -191,11 +186,7 @@ def register_callbacks(app):
         if (alarm_context
                 and str(alarm_context.get("patient_id")) == str(patient_id)
                 and alarm_context.get("metric_key") in metrics):
-            alarm_marker = {
-                "datetime": alarm_context["iso_date"],
-                "value": alarm_context["value"],
-                "metric_key": alarm_context["metric_key"],
-            }
+            alarm_marker = Alarm.from_context(alarm_context).to_marker()
 
         # Generar figura segun modo
         if view_mode == "overlay":
@@ -286,12 +277,12 @@ def register_callbacks(app):
 
         rows = []
         for i, a in enumerate(alarms):
-            badge_color = "danger" if a["type"] == "Alto" else "warning"
+            badge_color = "danger" if a.alert_type == AlertType.HIGH else "warning"
             rows.append(html.Tr([
-                html.Td(a["date"]),
-                html.Td(a["metric_name"]),
-                html.Td(f"{a['value']:.1f} {a['unit']}"),
-                html.Td(html.Span(a["type"], className=f"badge bg-{badge_color}")),
+                html.Td(a.formatted_date),
+                html.Td(a.metric_name),
+                html.Td(f"{a.value:.1f} {a.unit}"),
+                html.Td(html.Span(a.alert_type.display_name, className=f"badge bg-{badge_color}")),
                 html.Td(dbc.Button(
                     "Ver",
                     id={"type": "alarm-row-btn", "index": i},
@@ -303,11 +294,7 @@ def register_callbacks(app):
         # Store alarm data for lookup when clicking "Ver"
         alarm_store = dcc.Store(
             id="alarm-list-store",
-            data=[{
-                "iso_date": a["iso_date"],
-                "metric_key": a["metric_key"],
-                "value": a["value"],
-            } for a in alarms]
+            data=[a.to_context() for a in alarms]
         )
 
         table = dbc.Table([
@@ -354,12 +341,8 @@ def register_callbacks(app):
         if not alarm_list or index >= len(alarm_list):
             raise PreventUpdate
 
-        alarm = alarm_list[index]
-        alarm_context = {
-            "patient_id": patient_id,
-            "iso_date": alarm["iso_date"],
-            "metric_key": alarm["metric_key"],
-            "value": alarm["value"],
-        }
+        alarm_data = alarm_list[index]
+        alarm_data["patient_id"] = patient_id
+        alarm_context = alarm_data
 
         return False, alarm_context, "/patient", patient_id

@@ -1,9 +1,10 @@
+from __future__ import annotations
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 from src.config import METRICS
 
 
-def _add_alarm_marker(fig, alarm_marker, row=None):
+def _add_alarm_marker(fig: go.Figure, alarm_marker: dict | None, row: int | None = None) -> None:
     """Add an alarm marker to a figure."""
     if not alarm_marker:
         return
@@ -26,7 +27,7 @@ def _add_alarm_marker(fig, alarm_marker, row=None):
         fig.add_trace(go.Scatter(**kwargs))
 
 
-def create_overlaid_figure(data_dict, alarm_marker=None):
+def create_overlaid_figure(data_dict: dict, alarm_marker: dict | None = None) -> go.Figure:
     """Crea figura con métricas superpuestas."""
     fig = go.Figure()
 
@@ -56,7 +57,7 @@ def create_overlaid_figure(data_dict, alarm_marker=None):
     return fig
 
 
-def create_subplot_figure(data_dict, alarm_marker=None):
+def create_subplot_figure(data_dict: dict, alarm_marker: dict | None = None) -> go.Figure:
     """Crea figura con subplots separados."""
     metrics = [m for m, df in data_dict.items() if not df.empty]
     n = len(metrics)
@@ -99,7 +100,7 @@ def create_subplot_figure(data_dict, alarm_marker=None):
     return fig
 
 
-def calculate_stats(data_dict):
+def calculate_stats(data_dict: dict) -> list[dict]:
     """Calcula estadísticas por métrica."""
     stats = []
     for metric, df in data_dict.items():

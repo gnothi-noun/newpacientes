@@ -1,6 +1,10 @@
+from __future__ import annotations
 import pandas as pd
 import matplotlib.pyplot as plt
 from dataclasses import dataclass
+from datetime import datetime
+from enum import Enum
+from typing import Optional
 
 user = "root"
 password = "Mysqlpassword?"
@@ -85,4 +89,82 @@ METRICS = {
         "normal_max": None
     }
 }
+
+
+class AlertType(str, Enum):
+    LOW = "low"
+    HIGH = "high"
+    BOTH = "both"
+
+    @property
+    def display_name(self) -> str:
+        """Spanish display name for UI."""
+        return {"low": "Bajo", "high": "Alto", "both": "Ambos"}[self.value]
+
+
+@dataclass
+class Alarm:
+    patient_id: str
+    metric_key: str
+    value: float
+    timestamp: datetime
+    alert_type: AlertType
+    metric_name: str = ""
+    unit: str = ""
+    color: str = ""
+
+    @property
+    def iso_date(self) -> str:
+        return self.timestamp.isoformat()
+
+    @property
+    def formatted_date(self) -> str:
+        return self.timestamp.strftime("%d/%m/%Y %H:%M")
+
+    def to_context(self) -> dict:
+        """Minimal dict for dcc.Store serialization."""
+        return {
+            "patient_id": self.patient_id,
+            "iso_date": self.iso_date,
+            "metric_key": self.metric_key,
+            "value": self.value,
+        }
+
+    def to_marker(self) -> dict:
+        """Dict for figures.py alarm marker on graph."""
+        return {
+            "datetime": self.iso_date,
+            "value": self.value,
+            "metric_key": self.metric_key,
+        }
+
+    @classmethod
+    def from_context(cls, ctx: dict) -> Alarm:
+        """Reconstruct from dcc.Store dict."""
+        cfg = METRICS.get(ctx["metric_key"], {})
+        return cls(
+            patient_id=str(ctx["patient_id"]),
+            metric_key=ctx["metric_key"],
+            value=ctx["value"],
+            timestamp=datetime.fromisoformat(ctx["iso_date"]),
+            alert_type=AlertType(ctx["alert_type"]) if "alert_type" in ctx else AlertType.LOW,
+            metric_name=cfg.get("name", ""),
+            unit=cfg.get("unit", ""),
+            color=cfg.get("color", ""),
+        )
+
+    @classmethod
+    def from_row(cls, patient_id: str, metric_key: str, row, alert_type: AlertType) -> Alarm:
+        """Create from a wearable_df row."""
+        cfg = METRICS[metric_key]
+        return cls(
+            patient_id=patient_id,
+            metric_key=metric_key,
+            value=row["value"],
+            timestamp=row["record_datetime"],
+            alert_type=alert_type,
+            metric_name=cfg["name"],
+            unit=cfg["unit"],
+            color=cfg["color"],
+        )
 
