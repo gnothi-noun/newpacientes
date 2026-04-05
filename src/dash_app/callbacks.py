@@ -7,7 +7,7 @@ from src.data_loader import (
     get_patient_info, get_filtered_data, load_all_data,
     get_patients_summary, get_patients_with_alerts, get_patient_alarm_history
 )
-from src.dash_app.figures import create_overlaid_figure, create_subplot_figure, calculate_stats
+from src.dash_app.figures import create_overlaid_figure, create_subplot_figure, create_temperature_alarm_figure, calculate_stats
 from src.dash_app.pages.patient_monitor import create_patient_monitor_layout
 from src.dash_app.pages.dashboard import (
     create_dashboard_layout, create_alerts_panel, create_patients_table
@@ -151,10 +151,18 @@ def register_callbacks(app):
             default_time_start = window_start.hour
             default_time_end = window_end.hour
             # Show all core metrics so the user can correlate
-            default_metrics = [
-                "heart_rate", "blood_oxygen_saturation",
-                "systolic_blood_pressure", "diastolic_blood_pressure",
-            ]
+            alarm_metric = alarm_context.get("metric_key")
+            if alarm_metric == "temperature":
+                default_metrics = [
+                    "temperature",
+                    "heart_rate", "blood_oxygen_saturation",
+                    "systolic_blood_pressure", "diastolic_blood_pressure",
+                ]
+            else:
+                default_metrics = [
+                    "heart_rate", "blood_oxygen_saturation",
+                    "systolic_blood_pressure", "diastolic_blood_pressure",
+                ]
         else:
             # Default to most recent 7 days
             default_start_date = max(min_date, max_date - timedelta(days=6))
@@ -248,7 +256,9 @@ def register_callbacks(app):
             alarm = Alarm.from_context(alarm_context)
 
         # Generar figura segun modo
-        if view_mode == "overlay":
+        if alarm and alarm.metric_key == "temperature":
+            fig = create_temperature_alarm_figure(data_dict, alarm=alarm)
+        elif view_mode == "overlay":
             fig = create_overlaid_figure(data_dict, alarm=alarm)
         else:
             fig = create_subplot_figure(data_dict, alarm=alarm)
@@ -262,7 +272,7 @@ def register_callbacks(app):
             dbc.Col([
                 dbc.Card([
                     dbc.CardBody([
-                        html.H6(s["metric"], className="mb-2"),
+                        html.H6(s["metric"], className="mb-2", style={"fontWeight": "bold", "fontSize": "1.1rem"}),
                         html.P(f"Min: {s['min']:.1f} {s['unit']}", className="mb-1 small"),
                         html.P(f"Max: {s['max']:.1f} {s['unit']}", className="mb-1 small"),
                         html.P(f"Prom: {s['avg']:.1f} {s['unit']}", className="mb-0 small")

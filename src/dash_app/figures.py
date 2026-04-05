@@ -50,7 +50,8 @@ def create_overlaid_figure(data_dict: dict, alarm: Alarm | None = None) -> go.Fi
             y=df["value"],
             name=cfg["name"],
             line=dict(color=cfg["color"], width=2),
-            hovertemplate=f"{cfg['name']}: %{{y:.1f}} {cfg['unit']}<extra></extra>"
+            hovertemplate=f"{cfg['name']}: %{{y:.1f}} {cfg['unit']}<extra></extra>",
+            showlegend=True
         ))
 
     if alarm:
@@ -118,6 +119,71 @@ def create_subplot_figure(data_dict: dict, alarm: Alarm | None = None) -> go.Fig
         template="plotly_dark",
         height=200 * n,
         showlegend=False,
+        margin=dict(l=60, r=20, t=40, b=40)
+    )
+
+    return fig
+
+
+def create_temperature_alarm_figure(data_dict: dict, alarm: Alarm) -> go.Figure:
+    """Two subplots: temperature alone (top) with alarm, other metrics overlaid (bottom)."""
+    other_metrics = [m for m in data_dict if m != "temperature" and not data_dict[m].empty]
+    has_temp = "temperature" in data_dict and not data_dict["temperature"].empty
+
+    if not has_temp:
+        return create_subplot_figure(data_dict, alarm=alarm)
+
+    n_rows = 1 + (1 if other_metrics else 0)
+    titles = [METRICS["temperature"]["name"]]
+    if other_metrics:
+        titles.append("")
+
+    fig = make_subplots(
+        rows=n_rows, cols=1,
+        shared_xaxes=True,
+        vertical_spacing=0.08,
+        subplot_titles=titles
+    )
+
+    # Row 1: temperature
+    temp_df = data_dict["temperature"]
+    temp_cfg = METRICS["temperature"]
+    fig.add_trace(
+        go.Scatter(
+            x=temp_df["record_datetime"], y=temp_df["value"],
+            name=temp_cfg["name"],
+            line=dict(color=temp_cfg["color"], width=2),
+            showlegend=True
+        ), row=1, col=1
+    )
+    y_range = _y_range(temp_df)
+    if y_range:
+        fig.update_yaxes(title_text=temp_cfg["unit"], range=y_range, row=1, col=1)
+    else:
+        fig.update_yaxes(title_text=temp_cfg["unit"], row=1, col=1)
+
+    _add_alarm_marker(fig, alarm, row=1)
+
+    # Row 2: all other metrics overlaid
+    if other_metrics:
+        for m in other_metrics:
+            df = data_dict[m]
+            cfg = METRICS[m]
+            fig.add_trace(
+                go.Scatter(
+                    x=df["record_datetime"], y=df["value"],
+                    name=cfg["name"],
+                    line=dict(color=cfg["color"], width=2),
+                    showlegend=True
+                ), row=2, col=1
+            )
+        fig.update_yaxes(title_text="Valor", row=2, col=1)
+
+    fig.update_layout(
+        template="plotly_dark",
+        height=300 * n_rows,
+        showlegend=True,
+        legend=dict(orientation="h", yanchor="middle", y=0.48, xanchor="center", x=0.5),
         margin=dict(l=60, r=20, t=40, b=40)
     )
 
