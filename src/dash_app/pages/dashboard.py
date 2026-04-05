@@ -36,8 +36,8 @@ def create_alert_card(patient: dict) -> dbc.Card | None:
 def create_patient_row(patient: dict) -> html.Tr:
     """Create a table row for a patient."""
     cells = [
-        html.Td(patient["patient_id"], className="align-middle"),
-        html.Td(patient.get("genre", "-"), className="align-middle"),
+        html.Td(patient["patient_id"], className="align-middle text-center"),
+        html.Td(patient.get("genre", "-"), className="align-middle text-center"),
     ]
 
     # Add metric cells
@@ -48,17 +48,16 @@ def create_patient_row(patient: dict) -> html.Tr:
         has_alert = metric_info.get("has_alert", False)
 
         if value is not None:
-            unit = METRICS[metric_key]["unit"]
-            cell_content = f"{value:.1f} {unit}"
+            cell_content = f"{value:.1f}"
             if has_alert:
-                cells.append(html.Td(cell_content, className="align-middle fw-bold", style={"color": "#db7b65"}))
+                cells.append(html.Td(cell_content, className="align-middle text-center fw-bold", style={"color": "#db7b65"}))
             else:
-                cells.append(html.Td(cell_content, className="align-middle"))
+                cells.append(html.Td(cell_content, className="align-middle text-center"))
             continue
         else:
             cell_content = "-"
 
-        cells.append(html.Td(cell_content, className="align-middle text-muted"))
+        cells.append(html.Td(cell_content, className="align-middle text-center text-muted"))
 
     # Alert indicator
     alert_count = len(patient["alerts"])
@@ -107,7 +106,7 @@ def create_dashboard_layout():
         html.Div([
             html.H4("Resumen de Pacientes", className="mb-3"),
             html.Div(id="patients-table-container")
-        ]),
+        ], style={"marginLeft": "16.67%"}),
 
         # Stores for alarm history
         dcc.Store(id="alarm-history-patient-store"),
@@ -178,12 +177,13 @@ def create_patients_table(all_patients: list[dict]) -> dbc.Table:
         html.Thead(html.Tr([
             html.Th("ID", className="text-center"),
             html.Th("Genero", className="text-center"),
-            html.Th("FC (bpm)", className="text-center"),
-            html.Th("SpO2 (%)", className="text-center"),
-            html.Th("Temp (C)", className="text-center"),
+            html.Th("FC", className="text-center"),
+            html.Th("SpO2", className="text-center"),
+            html.Th("Temp", className="text-center"),
             html.Th("PA Sist.", className="text-center"),
             html.Th("Estado", className="text-center"),
             html.Th("Historial", className="text-center"),
         ])),
         html.Tbody(rows)
-    ], bordered=True, hover=True, responsive=True, className="table-dark")
+    ], bordered=True, hover=True, responsive=True, size="sm", className="table-dark",
+       style={"width": "auto"})

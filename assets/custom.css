@@ -44,6 +44,14 @@
     border: 1px solid #444;
 }
 
+/* Compact patient table */
+.table-dark.table-sm td,
+.table-dark.table-sm th {
+    padding: 0.4rem 1.05rem !important;
+    white-space: nowrap;
+    font-size: 1.05rem;
+}
+
 /* Alert badge color override */
 .badge.bg-danger {
     background-color: #db7b65 !important;

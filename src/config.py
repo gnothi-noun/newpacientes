@@ -48,28 +48,28 @@ IMEI: dict[str, int] = {
 METRICS = {
     "heart_rate": {
         "name": "Frecuencia Cardíaca",
-        "color": "#FF6B6B",
+        "color": "#E06464",
         "unit": "bpm",
         "normal_min": 50,
         "normal_max": 120
     },
     "blood_oxygen_saturation": {
         "name": "Saturación O2",
-        "color": "#4ECDC4",
+        "color": "#A268BA",
         "unit": "%",
         "normal_min": 80,
         "normal_max": 100
     },
     "systolic_blood_pressure": {
         "name": "Presión Sistólica",
-        "color": "#45B7D1",
+        "color": "#68c2f6",
         "unit": "mmHg",
         "normal_min": 90,
         "normal_max": 140
     },
     "diastolic_blood_pressure": {
         "name": "Presión Diastólica",
-        "color": "#96CEB4",
+        "color": "#8eb69b",
         "unit": "mmHg",
         "normal_min": 60,
         "normal_max": 90
