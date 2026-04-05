@@ -178,9 +178,32 @@ def register_callbacks(app):
         if not patient_id or not date_start or not date_end or not metrics:
             return {}, html.Div("Selecciona paciente, fechas y metricas", className="bg-dark text-white")
 
+        # Hidden graph used for warning states
+        hidden_graph = {
+            "data": [],
+            "layout": {"template": "plotly_dark", "height": 1, "paper_bgcolor": "rgba(0,0,0,0)",
+                        "plot_bgcolor": "rgba(0,0,0,0)", "margin": {"t": 0, "b": 0, "l": 0, "r": 0},
+                        "xaxis": {"visible": False}, "yaxis": {"visible": False},
+                        "modebar": {"bgcolor": "rgba(0,0,0,0)", "orientation": "v", "activecolor": "rgba(0,0,0,0)", "color": "rgba(0,0,0,0)"}}
+        }
+
+        invalid_range = (date_start > date_end) or (date_start == date_end and time_start >= time_end)
+        if invalid_range:
+            warning = html.Div(
+                html.Div(
+                    "\u26a0\ufe0f La fecha de inicio no puede ser posterior a la fecha de fin. "
+                    "Por favor, selecciona un rango de fechas valido.",
+                    className="text-center text-white p-3",
+                    style={"maxWidth": "500px", "backgroundColor": "#082e53",
+                           "border": "1px solid #375a7f", "borderRadius": "4px"},
+                ),
+                style={"display": "flex", "alignItems": "center", "justifyContent": "center", "height": "65vh"},
+            )
+            return hidden_graph, warning
+
         info = get_patient_info(patient_id)
         if not info:
-            return {}, html.Div("Paciente no encontrado", className="text-danger")
+            return hidden_graph, html.Div("Paciente no encontrado", className="text-danger")
 
         imei = info["imei"]
 
@@ -193,7 +216,16 @@ def register_callbacks(app):
         # Verificar si hay datos
         total_points = sum(len(df) for df in data_dict.values())
         if total_points == 0:
-            return {}, html.Div("Sin datos para el rango seleccionado", className="text-warning")
+            warning = html.Div(
+                html.Div(
+                    "\ud83d\udcca No hay datos disponibles para el rango de tiempo seleccionado.",
+                    className="text-center text-white p-3",
+                    style={"maxWidth": "500px", "backgroundColor": "#082e53",
+                           "border": "1px solid #375a7f", "borderRadius": "4px"},
+                ),
+                style={"display": "flex", "alignItems": "center", "justifyContent": "center", "height": "65vh"},
+            )
+            return hidden_graph, warning
 
         # Reconstruct Alarm from store context if it matches current patient/metrics
         alarm = None
