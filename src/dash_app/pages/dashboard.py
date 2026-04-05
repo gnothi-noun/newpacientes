@@ -44,7 +44,7 @@ def create_patient_row(patient: dict) -> html.Tr:
     metric_keys = ["heart_rate", "blood_oxygen_saturation", "temperature", "systolic_blood_pressure"]
     for metric_key in metric_keys:
         metric_info = patient["metrics"].get(metric_key, {})
-        value = metric_info.get("latest_value")
+        value = metric_info.get("display_value", metric_info.get("latest_value"))
         has_alert = metric_info.get("has_alert", False)
 
         if value is not None:

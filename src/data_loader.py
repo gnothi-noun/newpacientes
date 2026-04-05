@@ -103,6 +103,45 @@ def get_filtered_data(imei: str, metric: str, date_start, date_end, time_start=N
     return df[["record_datetime", "value"]]
 
 
+def _detect_alarms(
+    patient_id: str,
+    patient_data: pd.DataFrame,
+    metric_filter: str | None = None,
+) -> list[Alarm]:
+    """Single source of truth for alarm detection.
+
+    Scans patient_data for values outside normal ranges defined in METRICS.
+    Returns one Alarm per out-of-range reading, sorted by timestamp descending.
+    """
+    alarms: list[Alarm] = []
+
+    for metric_key, metric_cfg in METRICS.items():
+        normal_min = metric_cfg.get("normal_min")
+        normal_max = metric_cfg.get("normal_max")
+
+        if normal_min is None or normal_max is None:
+            continue
+
+        if metric_filter and metric_filter != "all" and metric_filter != metric_key:
+            continue
+
+        metric_data = patient_data[patient_data["metric"] == metric_key]
+        if metric_data.empty:
+            continue
+
+        low = metric_data[metric_data["value"] < normal_min]
+        high = metric_data[metric_data["value"] > normal_max]
+
+        for _, row in low.iterrows():
+            alarms.append(Alarm.from_row(patient_id, metric_key, row, AlertType.LOW))
+
+        for _, row in high.iterrows():
+            alarms.append(Alarm.from_row(patient_id, metric_key, row, AlertType.HIGH))
+
+    alarms.sort(key=lambda a: a.timestamp, reverse=True)
+    return alarms
+
+
 def get_patients_summary() -> list[dict]:
     """Get summary of all patients with their latest values and alert status."""
     patients_df, wearable_df = load_all_data()
@@ -113,7 +152,7 @@ def get_patients_summary() -> list[dict]:
     summary: list[dict] = []
 
     for _, patient in patients_df.iterrows():
-        patient_id = patient["patient_id"]
+        patient_id = str(patient["patient_id"])
         imei = str(patient["imei"])
 
         patient_data = wearable_df[
@@ -121,78 +160,59 @@ def get_patients_summary() -> list[dict]:
             (wearable_df["record_datetime"] >= week_ago)
         ]
 
-        patient_summary: dict = {
-            "patient_id": patient_id,
-            "imei": imei,
-            "genre": patient.get("genre", ""),
-            "alerts": [],
-            "metrics": {}
-        }
+        # Detect alarms via single source of truth
+        alarms = _detect_alarms(patient_id, patient_data)
 
-        for metric_key, metric_cfg in METRICS.items():
+        # Build per-metric summary for the dashboard table
+        metrics_summary: dict = {}
+        for metric_key in METRICS:
+            metric_alarms = [a for a in alarms if a.metric_key == metric_key]
             metric_data = patient_data[patient_data["metric"] == metric_key]
 
             if metric_data.empty:
-                patient_summary["metrics"][metric_key] = {
+                metrics_summary[metric_key] = {
                     "latest_value": None,
                     "has_alert": False,
-                    "alert_type": None
+                    "alert_type": None,
                 }
                 continue
 
-            latest_row = metric_data.loc[metric_data["record_datetime"].idxmax()]
-            latest_value = latest_row["value"]
+            latest_value = metric_data.loc[metric_data["record_datetime"].idxmax()]["value"]
+            has_alert = len(metric_alarms) > 0
 
-            normal_min = metric_cfg.get("normal_min")
-            normal_max = metric_cfg.get("normal_max")
-
-            has_alert = False
             alert_type: AlertType | None = None
-            alert_value: float | None = None
-            alert_datetime = None
+            display_value = latest_value
+            if has_alert:
+                types = {a.alert_type for a in metric_alarms}
+                if AlertType.LOW in types and AlertType.HIGH in types:
+                    alert_type = AlertType.BOTH
+                else:
+                    alert_type = next(iter(types))
+                # Show the most recent alarm value instead of the latest reading
+                display_value = metric_alarms[0].value
 
-            if normal_min is not None and normal_max is not None:
-                low_alerts = metric_data[metric_data["value"] < normal_min]
-                high_alerts = metric_data[metric_data["value"] > normal_max]
-
-                if not low_alerts.empty:
-                    has_alert = True
-                    alert_type = AlertType.LOW
-                    low_latest_idx = low_alerts["record_datetime"].idxmax()
-                    alert_value = low_alerts.loc[low_latest_idx]["value"]
-                    alert_datetime = low_alerts.loc[low_latest_idx]["record_datetime"]
-
-                if not high_alerts.empty:
-                    has_alert = True
-                    alert_type = AlertType.HIGH if alert_type is None else AlertType.BOTH
-                    high_latest_idx = high_alerts["record_datetime"].idxmax()
-                    high_val = high_alerts.loc[high_latest_idx]["value"]
-                    high_dt = high_alerts.loc[high_latest_idx]["record_datetime"]
-                    if alert_value is None or high_alerts["record_datetime"].max() > low_alerts["record_datetime"].max():
-                        alert_value = high_val
-                        alert_datetime = high_dt
-
-            patient_summary["metrics"][metric_key] = {
+            metrics_summary[metric_key] = {
                 "latest_value": latest_value,
+                "display_value": display_value,
                 "has_alert": has_alert,
                 "alert_type": alert_type,
-                "alert_value": alert_value
             }
 
-            if has_alert and alert_value is not None and alert_datetime is not None:
-                alarm = Alarm(
-                    patient_id=patient_id,
-                    metric_key=metric_key,
-                    value=alert_value,
-                    timestamp=alert_datetime.to_pydatetime(),
-                    alert_type=alert_type,
-                    metric_name=metric_cfg["name"],
-                    unit=metric_cfg["unit"],
-                    color=metric_cfg["color"],
-                )
-                patient_summary["alerts"].append(alarm)
+        # Keep only the most recent alarm per metric for the dashboard cards
+        seen_metrics: set[str] = set()
+        dashboard_alarms: list[Alarm] = []
+        for a in alarms:
+            if a.metric_key not in seen_metrics:
+                seen_metrics.add(a.metric_key)
+                dashboard_alarms.append(a)
 
-        summary.append(patient_summary)
+        summary.append({
+            "patient_id": patient_id,
+            "imei": imei,
+            "genre": patient.get("genre", ""),
+            "alerts": dashboard_alarms,
+            "metrics": metrics_summary,
+        })
 
     return summary
 
@@ -200,7 +220,7 @@ def get_patients_summary() -> list[dict]:
 def get_patients_with_alerts() -> list[dict]:
     """Get only patients that have active alerts."""
     summary = get_patients_summary()
-    return [p for p in summary if len(p["alerts"]) > 0]
+    return [p for p in summary if p["alerts"]]
 
 
 def get_patient_alarm_history(
@@ -228,30 +248,4 @@ def get_patient_alarm_history(
     if patient_data.empty:
         return []
 
-    alarms: list[Alarm] = []
-
-    for metric_key, metric_cfg in METRICS.items():
-        normal_min = metric_cfg.get("normal_min")
-        normal_max = metric_cfg.get("normal_max")
-
-        if normal_min is None or normal_max is None:
-            continue
-
-        if metric_filter and metric_filter != "all" and metric_filter != metric_key:
-            continue
-
-        metric_data = patient_data[patient_data["metric"] == metric_key]
-        if metric_data.empty:
-            continue
-
-        low = metric_data[metric_data["value"] < normal_min]
-        high = metric_data[metric_data["value"] > normal_max]
-
-        for _, row in low.iterrows():
-            alarms.append(Alarm.from_row(str(patient_id), metric_key, row, AlertType.LOW))
-
-        for _, row in high.iterrows():
-            alarms.append(Alarm.from_row(str(patient_id), metric_key, row, AlertType.HIGH))
-
-    alarms.sort(key=lambda a: a.timestamp, reverse=True)
-    return alarms
+    return _detect_alarms(str(patient_id), patient_data, metric_filter)

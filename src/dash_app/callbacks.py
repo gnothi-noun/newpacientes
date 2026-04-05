@@ -78,6 +78,7 @@ def register_callbacks(app):
             patients_with_alerts = get_patients_with_alerts()
             for p in patients_with_alerts:
                 if str(p["patient_id"]) == str(patient_id) and p["alerts"]:
+                    # Store the most recent alarm
                     alarm: Alarm = p["alerts"][0]
                     alarm_context = alarm.to_context()
                     break
@@ -94,17 +95,19 @@ def register_callbacks(app):
         Output("date-end", "max_date_allowed"),
         Output("date-end", "date"),
         Output("metrics-checklist", "value"),
+        Output("time-start", "value"),
+        Output("time-end", "value"),
         Input("patient-dropdown", "value"),
         Input("alarm-context-store", "data")
     )
     def update_patient_info(patient_id, alarm_context):
-        empty = html.Div(), None, None, None, None, None, None, ["heart_rate", "blood_oxygen_saturation"]
+        empty = html.Div(), None, None, None, None, None, None, ["heart_rate", "blood_oxygen_saturation"], 0, 23
         if not patient_id:
             return empty
 
         info = get_patient_info(patient_id)
         if not info:
-            return html.Div("Paciente no encontrado"), None, None, None, None, None, None, ["heart_rate", "blood_oxygen_saturation"]
+            return html.Div("Paciente no encontrado"), None, None, None, None, None, None, ["heart_rate", "blood_oxygen_saturation"], 0, 23
 
         # Calcular edad
         try:
@@ -127,26 +130,37 @@ def register_callbacks(app):
         patient_data = wearable_df[wearable_df["imei"] == str(info["imei"])]
 
         if patient_data.empty:
-            return card, None, None, None, None, None, None, ["heart_rate", "blood_oxygen_saturation"]
+            return card, None, None, None, None, None, None, ["heart_rate", "blood_oxygen_saturation"], 0, 23
 
         min_date = patient_data["record_datetime"].min().date()
         max_date = patient_data["record_datetime"].max().date()
 
-        # Check if coming from an alarm click
+        # Defaults
         default_metrics = ["heart_rate", "blood_oxygen_saturation"]
-        print(f"[DEBUG update_patient_info] alarm_context={alarm_context}, patient_id={patient_id}")
+        default_time_start = 0
+        default_time_end = 23
+
+        # Check if coming from an alarm click
         if alarm_context and str(alarm_context.get("patient_id")) == str(patient_id):
-            # Set date range to the alarm's day
             alarm_dt = datetime.fromisoformat(alarm_context["iso_date"])
-            default_start_date = alarm_dt.date()
-            default_end_date = alarm_dt.date()
-            default_metrics = [alarm_context["metric_key"]]
+            # ±2 hours window around the alarm
+            window_start = alarm_dt - timedelta(hours=2)
+            window_end = alarm_dt + timedelta(hours=2)
+            default_start_date = window_start.date()
+            default_end_date = window_end.date()
+            default_time_start = window_start.hour
+            default_time_end = window_end.hour
+            # Show all core metrics so the user can correlate
+            default_metrics = [
+                "heart_rate", "blood_oxygen_saturation",
+                "systolic_blood_pressure", "diastolic_blood_pressure",
+            ]
         else:
             # Default to most recent 7 days
             default_start_date = max(min_date, max_date - timedelta(days=6))
             default_end_date = max_date
 
-        return card, min_date, max_date, default_start_date, min_date, max_date, default_end_date, default_metrics
+        return card, min_date, max_date, default_start_date, min_date, max_date, default_end_date, default_metrics, default_time_start, default_time_end
 
     @app.callback(
         Output("main-graph", "figure"),
@@ -181,18 +195,18 @@ def register_callbacks(app):
         if total_points == 0:
             return {}, html.Div("Sin datos para el rango seleccionado", className="text-warning")
 
-        # Build alarm marker if context matches
-        alarm_marker = None
+        # Reconstruct Alarm from store context if it matches current patient/metrics
+        alarm = None
         if (alarm_context
                 and str(alarm_context.get("patient_id")) == str(patient_id)
                 and alarm_context.get("metric_key") in metrics):
-            alarm_marker = Alarm.from_context(alarm_context).to_marker()
+            alarm = Alarm.from_context(alarm_context)
 
         # Generar figura segun modo
         if view_mode == "overlay":
-            fig = create_overlaid_figure(data_dict, alarm_marker=alarm_marker)
+            fig = create_overlaid_figure(data_dict, alarm=alarm)
         else:
-            fig = create_subplot_figure(data_dict, alarm_marker=alarm_marker)
+            fig = create_subplot_figure(data_dict, alarm=alarm)
 
         # Calcular estadisticas
         stats = calculate_stats(data_dict)

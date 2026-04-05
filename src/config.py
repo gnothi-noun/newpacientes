@@ -57,7 +57,7 @@ METRICS = {
         "name": "Saturación O2",
         "color": "#4ECDC4",
         "unit": "%",
-        "normal_min": 70,
+        "normal_min": 80,
         "normal_max": 100
     },
     "systolic_blood_pressure": {
@@ -78,7 +78,7 @@ METRICS = {
         "name": "Temperatura",
         "color": "#FFEAA7",
         "unit": "°C",
-        "normal_min": 30.0,
+        "normal_min": 33.0,
         "normal_max": 38.0
     },
     "daily_activity_steps": {
@@ -122,20 +122,12 @@ class Alarm:
         return self.timestamp.strftime("%d/%m/%Y %H:%M")
 
     def to_context(self) -> dict:
-        """Minimal dict for dcc.Store serialization."""
+        """Minimal dict for dcc.Store serialization (JSON boundary)."""
         return {
             "patient_id": self.patient_id,
             "iso_date": self.iso_date,
             "metric_key": self.metric_key,
             "value": self.value,
-        }
-
-    def to_marker(self) -> dict:
-        """Dict for figures.py alarm marker on graph."""
-        return {
-            "datetime": self.iso_date,
-            "value": self.value,
-            "metric_key": self.metric_key,
         }
 
     @classmethod

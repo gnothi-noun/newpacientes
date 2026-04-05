@@ -1,25 +1,22 @@
 from __future__ import annotations
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
-from src.config import METRICS
+from src.config import METRICS, Alarm
 
 
-def _add_alarm_marker(fig: go.Figure, alarm_marker: dict | None, row: int | None = None) -> None:
+def _add_alarm_marker(fig: go.Figure, alarm: Alarm, row: int | None = None) -> None:
     """Add an alarm marker to a figure."""
-    if not alarm_marker:
-        return
-    cfg = METRICS[alarm_marker["metric_key"]]
     kwargs = dict(
-        x=[alarm_marker["datetime"]],
-        y=[alarm_marker["value"]],
+        x=[alarm.iso_date],
+        y=[alarm.value],
         mode="markers+text",
         marker=dict(size=14, color="red", symbol="x", line=dict(width=2, color="white")),
-        text=[f"Alarma: {alarm_marker['value']:.1f} {cfg['unit']}"],
+        text=[f"Alarma: {alarm.value:.1f} {alarm.unit}"],
         textposition="top center",
         textfont=dict(color="red", size=12),
         name="Alarma",
         showlegend=False,
-        hovertemplate=f"ALARMA<br>{cfg['name']}: %{{y:.1f}} {cfg['unit']}<extra></extra>"
+        hovertemplate=f"ALARMA<br>{alarm.metric_name}: %{{y:.1f}} {alarm.unit}<extra></extra>"
     )
     if row is not None:
         fig.add_trace(go.Scatter(**kwargs), row=row, col=1)
@@ -27,7 +24,7 @@ def _add_alarm_marker(fig: go.Figure, alarm_marker: dict | None, row: int | None
         fig.add_trace(go.Scatter(**kwargs))
 
 
-def create_overlaid_figure(data_dict: dict, alarm_marker: dict | None = None) -> go.Figure:
+def create_overlaid_figure(data_dict: dict, alarm: Alarm | None = None) -> go.Figure:
     """Crea figura con métricas superpuestas."""
     fig = go.Figure()
 
@@ -43,7 +40,8 @@ def create_overlaid_figure(data_dict: dict, alarm_marker: dict | None = None) ->
             hovertemplate=f"{cfg['name']}: %{{y:.1f}} {cfg['unit']}<extra></extra>"
         ))
 
-    _add_alarm_marker(fig, alarm_marker)
+    if alarm:
+        _add_alarm_marker(fig, alarm)
 
     fig.update_layout(
         template="plotly_dark",
@@ -57,7 +55,7 @@ def create_overlaid_figure(data_dict: dict, alarm_marker: dict | None = None) ->
     return fig
 
 
-def create_subplot_figure(data_dict: dict, alarm_marker: dict | None = None) -> go.Figure:
+def create_subplot_figure(data_dict: dict, alarm: Alarm | None = None) -> go.Figure:
     """Crea figura con subplots separados."""
     metrics = [m for m, df in data_dict.items() if not df.empty]
     n = len(metrics)
@@ -86,9 +84,8 @@ def create_subplot_figure(data_dict: dict, alarm_marker: dict | None = None) -> 
         )
         fig.update_yaxes(title_text=cfg["unit"], row=i, col=1)
 
-        # Add alarm marker to the matching subplot
-        if alarm_marker and alarm_marker["metric_key"] == metric:
-            _add_alarm_marker(fig, alarm_marker, row=i)
+        if alarm and alarm.metric_key == metric:
+            _add_alarm_marker(fig, alarm, row=i)
 
     fig.update_layout(
         template="plotly_dark",
