@@ -4,6 +4,19 @@ from plotly.subplots import make_subplots
 from src.config import METRICS, Alarm
 
 
+def _y_range(df) -> list | None:
+    """Compute y-axis range from data with 5% padding above and below."""
+    if df.empty:
+        return None
+    data_min = df["value"].min()
+    data_max = df["value"].max()
+    span = data_max - data_min
+    if span == 0:
+        span = abs(data_max) * 0.1 or 1
+    padding = span * 0.15
+    return [data_min - padding, data_max + padding]
+
+
 def _add_alarm_marker(fig: go.Figure, alarm: Alarm, row: int | None = None) -> None:
     """Add an alarm marker to a figure."""
     kwargs = dict(
@@ -43,7 +56,7 @@ def create_overlaid_figure(data_dict: dict, alarm: Alarm | None = None) -> go.Fi
     if alarm:
         _add_alarm_marker(fig, alarm)
 
-    fig.update_layout(
+    layout_kwargs = dict(
         template="plotly_dark",
         hovermode="x unified",
         legend=dict(orientation="h", yanchor="bottom", y=1.02),
@@ -51,6 +64,16 @@ def create_overlaid_figure(data_dict: dict, alarm: Alarm | None = None) -> go.Fi
         xaxis_title="Fecha/Hora",
         yaxis_title="Valor"
     )
+
+    if len(data_dict) == 1:
+        metric = next(iter(data_dict))
+        cfg = METRICS[metric]
+        y_range = _y_range(data_dict[metric])
+        if y_range:
+            layout_kwargs["yaxis_range"] = y_range
+            layout_kwargs["yaxis_title"] = cfg["unit"]
+
+    fig.update_layout(**layout_kwargs)
 
     return fig
 
@@ -82,7 +105,11 @@ def create_subplot_figure(data_dict: dict, alarm: Alarm | None = None) -> go.Fig
             ),
             row=i, col=1
         )
-        fig.update_yaxes(title_text=cfg["unit"], row=i, col=1)
+        y_range = _y_range(df)
+        yaxis_kwargs = dict(title_text=cfg["unit"], row=i, col=1)
+        if y_range:
+            yaxis_kwargs["range"] = y_range
+        fig.update_yaxes(**yaxis_kwargs)
 
         if alarm and alarm.metric_key == metric:
             _add_alarm_marker(fig, alarm, row=i)

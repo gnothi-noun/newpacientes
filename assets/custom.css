@@ -98,6 +98,17 @@
     left: 100% !important;
     top: 0 !important;
     width: 100px !important;
+    background-color: #6f6f6f !important;
+}
+
+#time-start .Select-menu,
+#time-end .Select-menu {
+    background-color: #6f6f6f !important;
+}
+
+#time-start .Select-option,
+#time-end .Select-option {
+    background-color: #6f6f6f !important;
 }
 
 /* Scale down the calendar popup and open to the right of the date box */

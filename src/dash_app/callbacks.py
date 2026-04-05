@@ -175,8 +175,8 @@ def register_callbacks(app):
         Input("alarm-context-store", "data")
     )
     def update_graph(patient_id, date_start, date_end, time_start, time_end, metrics, view_mode, alarm_context):
-        if not patient_id or not date_start or not date_end or not metrics:
-            return {}, html.Div("Selecciona paciente, fechas y metricas", className="bg-dark text-white")
+        if not patient_id or not date_start or not date_end:
+            return {}, html.Div("Selecciona paciente y fechas", className="bg-dark text-white")
 
         # Hidden graph used for warning states
         hidden_graph = {
@@ -186,6 +186,19 @@ def register_callbacks(app):
                         "xaxis": {"visible": False}, "yaxis": {"visible": False},
                         "modebar": {"bgcolor": "rgba(0,0,0,0)", "orientation": "v", "activecolor": "rgba(0,0,0,0)", "color": "rgba(0,0,0,0)"}}
         }
+
+        if not metrics:
+            warning = html.Div(
+                html.Div(
+                    "\u26a0\ufe0f No hay métricas seleccionadas. "
+                    "Selecciona al menos una métrica para visualizar en el gráfico.",
+                    className="text-center text-white p-3",
+                    style={"maxWidth": "500px", "backgroundColor": "#082e53",
+                           "border": "1px solid #375a7f", "borderRadius": "4px"},
+                ),
+                style={"display": "flex", "alignItems": "center", "justifyContent": "center", "height": "65vh"},
+            )
+            return hidden_graph, warning
 
         invalid_range = (date_start > date_end) or (date_start == date_end and time_start >= time_end)
         if invalid_range:
