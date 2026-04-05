@@ -123,7 +123,7 @@ def register_callbacks(app):
                 html.Small(f"Edad: {age} anos", className="d-block mb-0"),
                 html.Small(f"Hospital: {info['hospital_id']}", className="d-block mb-0")
             ], className="p-2")
-        ], className="bg-transparent text-white")
+        ], className="text-white", style={"backgroundColor": "#6f6f6f", "border": "none"})
 
         # Obtener rango de fechas disponible
         _, wearable_df = load_all_data()
@@ -254,7 +254,7 @@ def register_callbacks(app):
                         html.P(f"Max: {s['max']:.1f} {s['unit']}", className="mb-1 small"),
                         html.P(f"Prom: {s['avg']:.1f} {s['unit']}", className="mb-0 small")
                     ], className="p-2")
-                ], className="bg-dark text-white")
+                ], className="text-white", style={"backgroundColor": "#6f6f6f", "border": "none"})
             ], width=2, className="mb-2") for s in stats
         ])
 

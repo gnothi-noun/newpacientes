@@ -35,7 +35,7 @@ def create_patient_monitor_layout(selected_patient_id=None):
             value=default_patient,
             clearable=False,
             style={
-                "backgroundColor": "#082e53",
+                "backgroundColor": "#ff8a65",
                 "color": "white"
             }
         ),

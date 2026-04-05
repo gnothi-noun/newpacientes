@@ -7,16 +7,16 @@
 
 /* Dropdown menu (opened state) */
 .Select-menu-outer {
-    background-color: #ff8a65 !important;
+    background-color: #db7b65 !important;
 }
 
 .Select-menu {
-    background-color: #ff8a65 !important;
+    background-color: #db7b65 !important;
 }
 
 /* Individual dropdown options */
 .Select-option {
-    background-color: #ff8a65 !important;
+    background-color: #db7b65 !important;
     color: white !important;
 }
 
@@ -44,6 +44,11 @@
     border: 1px solid #444;
 }
 
+/* Alert badge color override */
+.badge.bg-danger {
+    background-color: #db7b65 !important;
+}
+
 .DateInput_input {
     background-color: #082e53 !important;
     color: white !important;
@@ -66,7 +71,19 @@
     background: #375a7f !important;
 }
 
-/* Hour dropdowns: open menu to the right of the box */
+/* Patient dropdown */
+#patient-dropdown .Select-control {
+    background-color: #db7b65 !important;
+    border-color: #db7b65 !important;
+}
+
+/* Hour dropdowns: style and open menu to the right */
+#time-start .Select-control,
+#time-end .Select-control {
+    background-color: #082e53 !important;
+    border-color: #375a7f !important;
+}
+
 #time-start .Select-menu-outer,
 #time-end .Select-menu-outer {
     position: absolute !important;

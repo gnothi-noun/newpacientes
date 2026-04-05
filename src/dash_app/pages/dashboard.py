@@ -16,10 +16,10 @@ def create_alert_card(patient: dict) -> dbc.Card | None:
     return dbc.Card([
         dbc.CardHeader([
             html.H5(f"Paciente {patient['patient_id']}", className="mb-0 text-white")
-        ], className="bg-danger"),
+        ], style={"backgroundColor": "#db7b65"}),
         dbc.CardBody([
             html.Div([
-                html.Span(f"{main_alert.value:.1f}", className="display-6 text-danger"),
+                html.Span(f"{main_alert.value:.1f}", className="display-6", style={"color": "#db7b65"}),
                 html.Span(f" {main_alert.unit}", className="text-muted")
             ]),
             html.P(main_alert.metric_name, className="mb-1"),
@@ -28,9 +28,9 @@ def create_alert_card(patient: dict) -> dbc.Card | None:
                 className="text-muted"
             ),
             html.Hr(className="my-2"),
-            html.Small(f"{len(alerts)} alerta(s) activa(s)", className="text-warning")
+            html.Small(f"{len(alerts)} alerta(s) activa(s)", style={"color": "#db7b65"})
         ])
-    ], className="h-100", style={"cursor": "pointer"}, id={"type": "alert-card", "patient_id": patient["patient_id"]})
+    ], className="h-100 text-white", style={"cursor": "pointer", "backgroundColor": "#4a4a4a", "border": "none"}, id={"type": "alert-card", "patient_id": patient["patient_id"]})
 
 
 def create_patient_row(patient: dict) -> html.Tr:
@@ -49,13 +49,16 @@ def create_patient_row(patient: dict) -> html.Tr:
 
         if value is not None:
             unit = METRICS[metric_key]["unit"]
-            cell_class = "text-danger fw-bold" if has_alert else ""
             cell_content = f"{value:.1f} {unit}"
+            if has_alert:
+                cells.append(html.Td(cell_content, className="align-middle fw-bold", style={"color": "#db7b65"}))
+            else:
+                cells.append(html.Td(cell_content, className="align-middle"))
+            continue
         else:
-            cell_class = "text-muted"
             cell_content = "-"
 
-        cells.append(html.Td(cell_content, className=f"align-middle {cell_class}"))
+        cells.append(html.Td(cell_content, className="align-middle text-muted"))
 
     # Alert indicator
     alert_count = len(patient["alerts"])
@@ -63,12 +66,12 @@ def create_patient_row(patient: dict) -> html.Tr:
         status = dbc.Button(
             f"{alert_count} alerta(s)",
             id={"type": "alert-badge", "patient_id": patient["patient_id"]},
-            color="danger",
             size="sm",
-            n_clicks=0
+            n_clicks=0,
+            style={"backgroundColor": "#db7b65", "border": "none"}
         )
     else:
-        status = html.Span("OK", className="badge bg-success")
+        status = html.Span("OK", className="badge text-white", style={"backgroundColor": "#2fc4b2"})
 
     cells.append(html.Td(status, className="align-middle text-center"))
 
@@ -77,7 +80,7 @@ def create_patient_row(patient: dict) -> html.Tr:
         dbc.Button(
             "Historial",
             id={"type": "alarm-history-btn", "patient_id": patient["patient_id"]},
-            color="info",
+            style={"backgroundColor": "#26658c", "border": "none"},
             size="sm",
             n_clicks=0
         ),
@@ -160,7 +163,7 @@ def create_alerts_panel(patients_with_alerts: list[dict]):
 
     return html.Div([
         html.H4([
-            html.Span("Alertas Activas ", className="text-danger"),
+            html.Span("Alertas Activas ", style={"color": "#db7b65"}),
             dbc.Badge(f"{len(patients_with_alerts)}", color="danger", className="ms-2")
         ], className="mb-3"),
         dbc.Row(alert_cards)
