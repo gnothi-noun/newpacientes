@@ -118,11 +118,11 @@ def register_callbacks(app):
 
         card = dbc.Card([
             dbc.CardBody([
-                html.P(f"ID: {info['patient_id']}", className="mb-1"),
-                html.P(f"Genero: {info['genre'] or 'N/D'}", className="mb-1"),
-                html.P(f"Edad: {age} anos", className="mb-1"),
-                html.P(f"Hospital: {info['hospital_id']}", className="mb-0")
-            ])
+                html.Small(f"ID: {info['patient_id']}", className="d-block mb-0"),
+                html.Small(f"Genero: {info['genre'] or 'N/D'}", className="d-block mb-0"),
+                html.Small(f"Edad: {age} anos", className="d-block mb-0"),
+                html.Small(f"Hospital: {info['hospital_id']}", className="d-block mb-0")
+            ], className="p-2")
         ], className="bg-transparent text-white")
 
         # Obtener rango de fechas disponible

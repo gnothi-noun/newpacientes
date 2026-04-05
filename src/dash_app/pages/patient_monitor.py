@@ -59,8 +59,10 @@ def create_patient_monitor_layout(selected_patient_id=None):
             value=0,
             clearable=False,
             style={
-                "backgroundColor": "#3C6F55",
-                "color": "white"
+                "backgroundColor": "#082e53",
+                "color": "white",
+                "width": "100px",
+                "fontSize": "14px",
             }
         ),
 
@@ -72,7 +74,9 @@ def create_patient_monitor_layout(selected_patient_id=None):
             clearable=False,
             style={
                 "backgroundColor": "#082e53",
-                "color": "white"
+                "color": "white",
+                "width": "100px",
+                "fontSize": "14px",
             }
         ),
 
