@@ -45,10 +45,10 @@ def create_patient_monitor_layout(selected_patient_id=None):
         html.Hr(),
 
         html.Label("Fecha Inicio"),
-        dcc.DatePickerSingle(id="date-start", display_format="DD/MM/YYYY"),
+        html.Div(dcc.DatePickerSingle(id="date-start", display_format="DD/MM/YYYY"), className="d-block mb-2"),
 
-        html.Label("Fecha Fin", className="mt-2"),
-        dcc.DatePickerSingle(id="date-end", display_format="DD/MM/YYYY"),
+        html.Label("Fecha Fin"),
+        html.Div(dcc.DatePickerSingle(id="date-end", display_format="DD/MM/YYYY"), className="d-block"),
 
         html.Hr(),
 

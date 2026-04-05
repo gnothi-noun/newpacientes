@@ -45,14 +45,31 @@
 }
 
 .DateInput_input {
-    background-color: #37474f !important;
+    background-color: #082e53 !important;
     color: white !important;
+    font-size: 12px !important;
+    padding: 4px 8px !important;
+    line-height: 1.2 !important;
+}
+
+.DateInput {
+    width: 100px !important;
 }
 
 .SingleDatePickerInput {
-    background-color: #303030 !important;
+    background-color: #082e53 !important;
+    border: 1px solid #375a7f !important;
+    border-radius: 4px !important;
 }
 
 .CalendarDay__selected {
     background: #375a7f !important;
+}
+
+/* Scale down the calendar popup and open to the right of the date box */
+.SingleDatePicker_picker {
+    transform: scale(0.55);
+    transform-origin: top left;
+    left: 100% !important;
+    top: 0 !important;
 }
