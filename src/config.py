@@ -1,6 +1,5 @@
 from __future__ import annotations
 import pandas as pd
-import matplotlib.pyplot as plt
 from dataclasses import dataclass
 from datetime import datetime
 from enum import Enum

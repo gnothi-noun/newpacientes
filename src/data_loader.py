@@ -1,25 +1,38 @@
 from __future__ import annotations
 import json
+import os
 from functools import lru_cache
 from datetime import datetime, timedelta
 import pandas as pd
 import math
 from src.config import METRICS, Alarm, AlertType
 
-JSON_PATH = "RA.json"
+# Columnas de wearabledata realmente usadas por la app. Descartamos el resto
+# para reducir el uso de memoria (clave en la Raspberry Pi de 2 GB).
+WEARABLE_COLUMNS = ["imei", "metric", "record_datetime", "value"]
+
+# Rutas configurables por variable de entorno. En la Raspberry se usan los
+# Parquet (carga rápida y de bajo consumo de RAM); el JSON queda como respaldo
+# para la máquina de desarrollo.
+JSON_PATH = os.environ.get("VITAICARE_JSON", "RA.json")
+PARQUET_PATIENTS = os.environ.get("VITAICARE_PATIENTS_PARQUET", "RA_patients.parquet")
+PARQUET_WEARABLE = os.environ.get("VITAICARE_WEARABLE_PARQUET", "RA_wearable.parquet")
 
 
-@lru_cache(maxsize=1)
-def load_all_data():
-    """Carga datos una sola vez y los mantiene en memoria."""
-    with open(JSON_PATH, "r") as f:
-        data = json.load(f)
+def build_dataframes(data: dict) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """Construye los DataFrames a partir del dict crudo del JSON.
 
+    Centraliza el pre-procesamiento (tipos y zona horaria) para que el JSON y
+    el script de conversión a Parquet produzcan exactamente lo mismo.
+    """
     patients_df = pd.DataFrame(data["patients"])
     wearable_df = pd.DataFrame(data["wearabledata"])
 
-    # Pre-procesar tipos
-    # Los datos están en UTC, convertimos a hora de Argentina (UTC-3)
+    # Conservar solo las columnas necesarias.
+    wearable_df = wearable_df[[c for c in WEARABLE_COLUMNS if c in wearable_df.columns]]
+
+    # Pre-procesar tipos.
+    # Los datos están en UTC, convertimos a hora de Argentina (UTC-3).
     wearable_df["record_datetime"] = (
         pd.to_datetime(wearable_df["record_datetime"])
         .dt.tz_localize("UTC")  # Datos en UTC
@@ -28,6 +41,24 @@ def load_all_data():
     wearable_df["value"] = pd.to_numeric(wearable_df["value"], errors="coerce")
 
     return patients_df, wearable_df
+
+
+@lru_cache(maxsize=1)
+def load_all_data():
+    """Carga datos una sola vez y los mantiene en memoria.
+
+    Prefiere los Parquet ya procesados (rápidos y livianos en RAM). Si no
+    existen, recurre al JSON crudo y lo procesa en el momento.
+    """
+    if os.path.exists(PARQUET_PATIENTS) and os.path.exists(PARQUET_WEARABLE):
+        patients_df = pd.read_parquet(PARQUET_PATIENTS)
+        wearable_df = pd.read_parquet(PARQUET_WEARABLE)
+        return patients_df, wearable_df
+
+    with open(JSON_PATH, "r") as f:
+        data = json.load(f)
+
+    return build_dataframes(data)
 
 
 def get_patient_list() -> pd.DataFrame:
@@ -142,8 +173,14 @@ def _detect_alarms(
     return alarms
 
 
+@lru_cache(maxsize=1)
 def get_patients_summary() -> list[dict]:
-    """Get summary of all patients with their latest values and alert status."""
+    """Get summary of all patients with their latest values and alert status.
+
+    Cacheado: los datos son estáticos por despliegue (se cargan una vez del
+    Parquet), así que este cálculo pesado se hace una sola vez. Al reiniciar el
+    servicio (p. ej. tras desplegar datos nuevos) la caché se limpia sola.
+    """
     patients_df, wearable_df = load_all_data()
 
     now = pd.Timestamp.now(tz="America/Argentina/Buenos_Aires")
@@ -217,18 +254,24 @@ def get_patients_summary() -> list[dict]:
     return summary
 
 
+@lru_cache(maxsize=1)
 def get_patients_with_alerts() -> list[dict]:
-    """Get only patients that have active alerts."""
+    """Get only patients that have active alerts (reutiliza el summary cacheado)."""
     summary = get_patients_summary()
     return [p for p in summary if p["alerts"]]
 
 
+@lru_cache(maxsize=256)
 def get_patient_alarm_history(
     patient_id: str,
     metric_filter: str | None = None,
     days: int | None = None,
 ) -> list[Alarm]:
-    """Get historical alarms for a patient, sorted by timestamp descending."""
+    """Get historical alarms for a patient, sorted by timestamp descending.
+
+    Cacheado por (patient_id, metric_filter, days): datos estáticos, así que
+    reabrir el historial o "cargar más semanas" no recalcula lo ya visto.
+    """
     patients_df, wearable_df = load_all_data()
 
     patient = patients_df[patients_df["patient_id"] == str(patient_id)]

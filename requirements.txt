@@ -1,0 +1,16 @@
+# VITAICARE - runtime dependencies for the Dash dashboard (app.py)
+# Pinned to the versions validated on the development machine.
+# All have prebuilt wheels for 64-bit Raspberry Pi OS (aarch64).
+
+dash==3.3.0
+dash-bootstrap-components==2.0.4
+pandas==2.3.3
+plotly==6.5.2
+pyarrow==18.1.0          # read/write the Parquet data files
+gunicorn==23.0.0         # production WSGI server used by the systemd service
+
+# numpy / flask / werkzeug are installed automatically as dependencies of the above.
+#
+# NOTE: streamlit, weasyprint and markdown are only used by the auxiliary
+# scripts (convert_to_pdf.py, etc.) and are NOT required to run the dashboard,
+# so they are intentionally left out to keep the Pi install small.
