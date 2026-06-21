@@ -48,8 +48,9 @@
 #>
 [CmdletBinding()]
 param(
-    [Parameter(Mandatory = $true)][string]$Address,
-    [Parameter(Mandatory = $true)][string]$User,
+    # IP de Tailscale de la Pi (estable, funciona dentro y fuera de casa).
+    [string]$Address = "100.99.247.65",
+    [string]$User = "ro",
     [string]$Dest = "newpacientes",
     [int]$Port = 22,
     [string]$IdentityFile,

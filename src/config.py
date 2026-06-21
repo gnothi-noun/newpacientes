@@ -16,6 +16,9 @@ class TimeConfig:
     sample_period_minutes: int = 5
     gap_threshold_minutes: int = 5  # para marcar "hueco" si supera esto
     tz: str = "America/Argentina/Buenos_Aires"
+    # Enfriamiento de alarmas: tras disparar una alarma de una métrica+tipo,
+    # se ignoran nuevas alarmas de esa misma métrica+tipo hasta que pase esto.
+    alarm_cooldown_minutes: int = 60
 CFG = TimeConfig()
 
 IMEI: dict[str, int] = {
@@ -77,7 +80,7 @@ METRICS = {
         "name": "Temperatura",
         "color": "#FFEAA7",
         "unit": "°C",
-        "normal_min": 33.0,
+        "normal_min": 25.0,
         "normal_max": 38.0
     },
     "daily_activity_steps": {

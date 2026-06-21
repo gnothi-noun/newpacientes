@@ -5,8 +5,22 @@ from datetime import datetime, timedelta
 from src.config import Alarm, AlertType
 from src.data_loader import (
     get_patient_info, get_filtered_data, load_all_data,
-    get_patients_summary, get_patients_with_alerts, get_patient_alarm_history
+    get_patients_summary, get_patients_with_alerts, get_patient_alarm_history,
+    group_consecutive_alarms
 )
+
+
+def _format_alarm_range(start, end, count) -> str:
+    """Formatea la fecha de un evento de alarma.
+
+    Un solo registro -> fecha y hora puntual. Varios consecutivos -> rango
+    "de tal hora a tal hora" (mostrando ambas fechas solo si cruzan de día).
+    """
+    if count <= 1:
+        return start.strftime("%d/%m/%Y %H:%M")
+    if start.date() == end.date():
+        return f"{start.strftime('%d/%m/%Y')} {start.strftime('%H:%M')} - {end.strftime('%H:%M')}"
+    return f"{start.strftime('%d/%m/%Y %H:%M')} - {end.strftime('%d/%m/%Y %H:%M')}"
 from src.dash_app.figures import create_overlaid_figure, create_subplot_figure, create_temperature_alarm_figure, calculate_stats
 from src.dash_app.pages.patient_monitor import create_patient_monitor_layout
 from src.dash_app.pages.dashboard import (
@@ -344,14 +358,27 @@ def register_callbacks(app):
                 className="text-center"
             ), {"display": "block"} if len(all_alarms) > 0 else {"display": "none"}
 
+        # Agrupar alarmas consecutivas (misma métrica+tipo) en un solo evento.
+        groups = group_consecutive_alarms(alarms)
+
         rows = []
-        for i, a in enumerate(alarms):
-            badge_color = "danger" if a.alert_type == AlertType.HIGH else "warning"
+        for i, g in enumerate(groups):
+            badge_color = "danger" if g["alert_type"] == AlertType.HIGH else "warning"
+            fecha = _format_alarm_range(g["start"], g["end"], g["count"])
+            # Si el evento abarca varias horas, indicar la cantidad de alarmas.
+            if g["count"] > 1:
+                fecha_cell = html.Td([
+                    html.Div(fecha),
+                    html.Small(f"{g['count']} alarmas", className="text-muted"),
+                ])
+            else:
+                fecha_cell = html.Td(fecha)
+
             rows.append(html.Tr([
-                html.Td(a.formatted_date),
-                html.Td(a.metric_name),
-                html.Td(f"{a.value:.1f} {a.unit}"),
-                html.Td(html.Span(a.alert_type.display_name, className=f"badge bg-{badge_color}")),
+                fecha_cell,
+                html.Td(g["metric_name"]),
+                html.Td(f"{g['extreme_value']:.1f} {g['unit']}"),
+                html.Td(html.Span(g["alert_type"].display_name, className=f"badge bg-{badge_color}")),
                 html.Td(dbc.Button(
                     "Ver",
                     id={"type": "alarm-row-btn", "index": i},
@@ -360,10 +387,10 @@ def register_callbacks(app):
                 ))
             ]))
 
-        # Store alarm data for lookup when clicking "Ver"
+        # Store de contextos (uno por evento, en orden de fila) para el botón "Ver".
         alarm_store = dcc.Store(
             id="alarm-list-store",
-            data=[a.to_context() for a in alarms]
+            data=[g["context"] for g in groups]
         )
 
         table = dbc.Table([
@@ -384,7 +411,7 @@ def register_callbacks(app):
         return html.Div([
             alarm_store,
             html.Small(
-                f"{len(alarms)} alarma(s) en las ultimas {weeks} semanas"
+                f"{len(groups)} evento(s) ({len(alarms)} alarma(s)) en las ultimas {weeks} semanas"
                 + (f" (de {len(all_alarms)} totales)" if has_more else " (todas)"),
                 className="text-muted mb-2 d-block"
             ),

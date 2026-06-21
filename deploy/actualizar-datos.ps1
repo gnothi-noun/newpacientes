@@ -33,7 +33,8 @@
 #>
 [CmdletBinding()]
 param(
-    [string]$Address = "192.168.1.88",
+    # IP de Tailscale de la Pi (estable, funciona dentro y fuera de casa).
+    [string]$Address = "100.99.247.65",
     [string]$User = "ro",
     [string]$SqlFile = "RA.sql",
     [switch]$NoRestart

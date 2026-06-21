@@ -5,7 +5,7 @@ from functools import lru_cache
 from datetime import datetime, timedelta
 import pandas as pd
 import math
-from src.config import METRICS, Alarm, AlertType
+from src.config import METRICS, Alarm, AlertType, CFG
 
 # Columnas de wearabledata realmente usadas por la app. Descartamos el resto
 # para reducir el uso de memoria (clave en la Raspberry Pi de 2 GB).
@@ -134,6 +134,23 @@ def get_filtered_data(imei: str, metric: str, date_start, date_end, time_start=N
     return df[["record_datetime", "value"]]
 
 
+def _with_cooldown(rows_sorted: pd.DataFrame, cooldown: pd.Timedelta) -> list:
+    """Aplica un enfriamiento a lecturas fuera de rango.
+
+    Una vez que una lectura dispara una alarma, se ignoran las siguientes hasta
+    que pase `cooldown` desde esa alarma mostrada (no desde las ignoradas).
+    Espera `rows_sorted` ordenado ascendente por record_datetime.
+    """
+    kept: list = []
+    last_ts = None
+    for _, row in rows_sorted.iterrows():
+        ts = row["record_datetime"]
+        if last_ts is None or (ts - last_ts) >= cooldown:
+            kept.append(row)
+            last_ts = ts
+    return kept
+
+
 def _detect_alarms(
     patient_id: str,
     patient_data: pd.DataFrame,
@@ -142,9 +159,14 @@ def _detect_alarms(
     """Single source of truth for alarm detection.
 
     Scans patient_data for values outside normal ranges defined in METRICS.
-    Returns one Alarm per out-of-range reading, sorted by timestamp descending.
+    Aplica un enfriamiento por (métrica, tipo): tras disparar una alarma de una
+    métrica y tipo (bajo/alto), no se vuelve a disparar otra del mismo
+    métrica+tipo hasta que pase `CFG.alarm_cooldown_minutes`. Los tipos bajo y
+    alto, y las distintas métricas, se enfrían de forma independiente.
+    Returns alarms sorted by timestamp descending.
     """
     alarms: list[Alarm] = []
+    cooldown = pd.Timedelta(minutes=CFG.alarm_cooldown_minutes)
 
     for metric_key, metric_cfg in METRICS.items():
         normal_min = metric_cfg.get("normal_min")
@@ -160,13 +182,14 @@ def _detect_alarms(
         if metric_data.empty:
             continue
 
-        low = metric_data[metric_data["value"] < normal_min]
-        high = metric_data[metric_data["value"] > normal_max]
+        # Ordenar ascendente para aplicar el enfriamiento cronológicamente.
+        low = metric_data[metric_data["value"] < normal_min].sort_values("record_datetime")
+        high = metric_data[metric_data["value"] > normal_max].sort_values("record_datetime")
 
-        for _, row in low.iterrows():
+        for row in _with_cooldown(low, cooldown):
             alarms.append(Alarm.from_row(patient_id, metric_key, row, AlertType.LOW))
 
-        for _, row in high.iterrows():
+        for row in _with_cooldown(high, cooldown):
             alarms.append(Alarm.from_row(patient_id, metric_key, row, AlertType.HIGH))
 
     alarms.sort(key=lambda a: a.timestamp, reverse=True)
@@ -292,3 +315,62 @@ def get_patient_alarm_history(
         return []
 
     return _detect_alarms(str(patient_id), patient_data, metric_filter)
+
+
+def group_consecutive_alarms(alarms: list[Alarm]) -> list[dict]:
+    """Agrupa alarmas consecutivas de la misma métrica y tipo en un solo evento.
+
+    "Consecutivas" = misma métrica y mismo tipo (bajo/alto), separadas por no más
+    de 1.5x el enfriamiento (así una condición sostenida que dispara una alarma
+    por hora se muestra como un único evento con rango "de tal hora a tal hora",
+    en vez de un renglón por hora). Un corte mayor a ese umbral, o un cambio de
+    métrica/tipo, abre un evento nuevo.
+
+    Devuelve grupos ordenados del más reciente al más antiguo. Cada grupo:
+    metric_key, metric_name, unit, alert_type, start, end, count, extreme_value
+    (peor valor del evento) y context (de la alarma extrema, para "Ver").
+    """
+    if not alarms:
+        return []
+
+    group_gap = pd.Timedelta(minutes=CFG.alarm_cooldown_minutes * 1.5)
+
+    # Separar por (métrica, tipo): cada combinación se agrupa por su cuenta, así
+    # una alarma de otro tipo intercalada no corta la racha (p. ej. una "alta"
+    # entre dos "bajas" no debe partir el evento de "bajas").
+    buckets: dict[tuple, list[Alarm]] = {}
+    for a in alarms:
+        buckets.setdefault((a.metric_key, a.alert_type), []).append(a)
+
+    def _make_group(run: list[Alarm]) -> dict:
+        # Valor extremo del evento (mínimo si es "bajo", máximo si es "alto").
+        if run[0].alert_type == AlertType.HIGH:
+            extreme = max(run, key=lambda a: a.value)
+        else:
+            extreme = min(run, key=lambda a: a.value)
+        return {
+            "metric_key": run[0].metric_key,
+            "metric_name": run[0].metric_name,
+            "unit": run[0].unit,
+            "alert_type": run[0].alert_type,
+            "start": run[0].timestamp,
+            "end": run[-1].timestamp,
+            "count": len(run),
+            "extreme_value": extreme.value,
+            "context": extreme.to_context(),
+        }
+
+    groups: list[dict] = []
+    for bucket in buckets.values():
+        bucket.sort(key=lambda a: a.timestamp)  # cronológico dentro del grupo
+        run: list[Alarm] = [bucket[0]]
+        for prev, a in zip(bucket, bucket[1:]):
+            if (a.timestamp - prev.timestamp) <= group_gap:
+                run.append(a)
+            else:
+                groups.append(_make_group(run))
+                run = [a]
+        groups.append(_make_group(run))
+
+    groups.sort(key=lambda g: g["end"], reverse=True)  # más reciente primero
+    return groups

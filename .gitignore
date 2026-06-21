@@ -6,6 +6,7 @@
 **/__pycache__
 .venv/
 venv/
+memory/
 # Credenciales y secretos: nunca en git, y el deploy NO los pisa en la Pi.
 users.json
 .flask_secret
