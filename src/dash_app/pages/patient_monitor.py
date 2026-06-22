@@ -101,7 +101,23 @@ def create_patient_monitor_layout(selected_patient_id=None):
             ],
             value="overlay",
             labelStyle={"display": "block", "marginBottom": "5px"}
-        )
+        ),
+
+        html.Hr(),
+
+        html.Label("Descargar informe"),
+        dcc.RadioItems(
+            id="report-format-monitor",
+            options=[
+                {"label": " PDF", "value": "pdf"},
+                {"label": " CSV", "value": "csv"},
+            ],
+            value="pdf",
+            labelStyle={"display": "inline-block", "marginRight": "12px"}
+        ),
+        dbc.Button("Descargar", id="download-report-monitor-btn", color="info",
+                   className="w-100 mt-2", n_clicks=0),
+        dcc.Download(id="download-report-monitor")
 
     ], width=3, className="bg-dark p-3", style={"height": "calc(100vh - 56px)", "overflowY": "auto"})
 

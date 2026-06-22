@@ -442,3 +442,59 @@ def register_callbacks(app):
         alarm_context = alarm_data
 
         return False, alarm_context, "/patient", patient_id
+
+    # ==================== DESCARGA DE INFORMES ====================
+    @app.callback(
+        Output("download-report-monitor", "data"),
+        Input("download-report-monitor-btn", "n_clicks"),
+        State("report-format-monitor", "value"),
+        State("patient-dropdown", "value"),
+        State("date-start", "date"),
+        State("date-end", "date"),
+        State("time-start", "value"),
+        State("time-end", "value"),
+        State("metrics-checklist", "value"),
+        prevent_initial_call=True
+    )
+    def download_patient_report(n_clicks, fmt, patient_id, date_start, date_end,
+                                time_start, time_end, metrics):
+        if not n_clicks or not patient_id or not date_start or not date_end or not metrics:
+            raise PreventUpdate
+        # Misma validación de rango que update_graph.
+        if date_start > date_end or (date_start == date_end and time_start >= time_end):
+            raise PreventUpdate
+
+        from src import reports  # import perezoso: baja la RAM de arranque en la Pi
+
+        base = f"informe_{patient_id}_{date_start}_{date_end}"
+        if fmt == "csv":
+            df = reports.build_patient_csv(patient_id, metrics, date_start, date_end,
+                                           time_start, time_end)
+            # BOM UTF-8 para que Excel muestre bien los acentos.
+            csv_str = "\ufeff" + df.to_csv(index=False)
+            return dict(content=csv_str, filename=f"{base}.csv", type="text/csv")
+
+        pdf_bytes = reports.build_patient_pdf(patient_id, metrics, date_start, date_end,
+                                              time_start, time_end)
+        return dcc.send_bytes(lambda buf: buf.write(pdf_bytes), f"{base}.pdf")
+
+    @app.callback(
+        Output("download-report-summary", "data"),
+        Input("download-report-summary-btn", "n_clicks"),
+        State("report-format-summary", "value"),
+        prevent_initial_call=True
+    )
+    def download_summary_report(n_clicks, fmt):
+        if not n_clicks:
+            raise PreventUpdate
+
+        from src import reports  # import perezoso
+
+        base = f"resumen_pacientes_{datetime.now().strftime('%Y-%m-%d')}"
+        if fmt == "csv":
+            df = reports.build_summary_csv()
+            csv_str = "\ufeff" + df.to_csv(index=False)  # BOM para Excel
+            return dict(content=csv_str, filename=f"{base}.csv", type="text/csv")
+
+        pdf_bytes = reports.build_summary_pdf()
+        return dcc.send_bytes(lambda buf: buf.write(pdf_bytes), f"{base}.pdf")

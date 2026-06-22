@@ -8,6 +8,8 @@ pandas==2.3.3
 plotly==6.5.2
 pyarrow==18.1.0          # read/write the Parquet data files
 gunicorn==23.0.0         # production WSGI server used by the systemd service
+fpdf2==2.8.7             # generación de informes PDF (pura-Python, liviano)
+matplotlib==3.10.8       # gráficos de los informes (backend headless "Agg")
 
 # numpy / flask / werkzeug are installed automatically as dependencies of the above.
 #

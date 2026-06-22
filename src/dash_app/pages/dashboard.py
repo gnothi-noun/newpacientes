@@ -104,7 +104,21 @@ def create_dashboard_layout():
 
         # Summary Table Section
         html.Div([
-            html.H4("Resumen de Pacientes", className="mb-3"),
+            dbc.Row([
+                dbc.Col(html.H4("Resumen de Pacientes", className="mb-0"), width="auto"),
+                dbc.Col(dcc.RadioItems(
+                    id="report-format-summary",
+                    options=[
+                        {"label": " PDF", "value": "pdf"},
+                        {"label": " CSV", "value": "csv"},
+                    ],
+                    value="pdf",
+                    labelStyle={"display": "inline-block", "marginRight": "12px"}
+                ), width="auto"),
+                dbc.Col(dbc.Button("Descargar resumen", id="download-report-summary-btn",
+                                   color="info", size="sm", n_clicks=0), width="auto"),
+            ], className="mb-3 align-items-center"),
+            dcc.Download(id="download-report-summary"),
             html.Div(id="patients-table-container")
         ], style={"marginLeft": "16.67%"}),
 
