@@ -1,7 +1,7 @@
 from __future__ import annotations
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
-from src.config import METRICS, Alarm
+from src.config import METRICS, Alarm, ACFG
 
 
 def _y_range(df) -> list | None:
@@ -188,6 +188,100 @@ def create_temperature_alarm_figure(data_dict: dict, alarm: Alarm) -> go.Figure:
     )
 
     return fig
+
+
+def _empty_dark_fig(height: int, message: str) -> go.Figure:
+    """Figura vacía con un mensaje centrado (para estados sin datos)."""
+    fig = go.Figure()
+    fig.update_layout(
+        template="plotly_dark", height=height,
+        margin=dict(l=20, r=20, t=20, b=20),
+        xaxis=dict(visible=False), yaxis=dict(visible=False),
+        annotations=[dict(text=message, showarrow=False, font=dict(size=14, color="#bbb"))],
+    )
+    return fig
+
+
+def create_baseline_figure(df, baseline: dict, metric: str) -> go.Figure:
+    """Serie reciente del paciente con SU banda personal (circadiana) y los puntos
+    fuera de ese patrón resaltados."""
+    cfg = METRICS[metric]
+    if df is None or df.empty or not baseline.get("available"):
+        return _empty_dark_fig(330, "Línea base no disponible (datos insuficientes)")
+
+    overall = baseline["overall"]
+    buckets = baseline["buckets"]
+    bh = ACFG.circadian_bucket_hours
+    b = (df["record_datetime"].dt.hour // bh).astype(int)
+    low = b.map(lambda x: buckets.get(x, overall)[0])
+    high = b.map(lambda x: buckets.get(x, overall)[1])
+    x = df["record_datetime"]
+
+    fig = go.Figure()
+    # Banda personal (entre low y high).
+    fig.add_trace(go.Scatter(x=x, y=low, line=dict(width=0), hoverinfo="skip",
+                             showlegend=False, name="low"))
+    fig.add_trace(go.Scatter(x=x, y=high, line=dict(width=0), fill="tonexty",
+                             fillcolor="rgba(47,196,178,0.15)", hoverinfo="skip",
+                             name="Banda personal (p10–p90)"))
+    # Serie de la métrica.
+    fig.add_trace(go.Scatter(x=x, y=df["value"], line=dict(color=cfg["color"], width=1.5),
+                             name=cfg["name"],
+                             hovertemplate=f"%{{y:.1f}} {cfg['unit']}<extra></extra>"))
+    # Puntos fuera del patrón personal.
+    oob = (df["value"] < low) | (df["value"] > high)
+    if oob.any():
+        fig.add_trace(go.Scatter(x=x[oob], y=df["value"][oob], mode="markers",
+                                 marker=dict(color="#db7b65", size=6),
+                                 name="Fuera de su patrón",
+                                 hovertemplate=f"Fuera de patrón<br>%{{y:.1f}} {cfg['unit']}<extra></extra>"))
+
+    fig.update_layout(template="plotly_dark", height=330,
+                      margin=dict(l=55, r=20, t=30, b=40),
+                      legend=dict(orientation="h", yanchor="bottom", y=1.02, font=dict(size=10)),
+                      yaxis_title=cfg["unit"], xaxis_title="Fecha/Hora")
+    return fig
+
+
+def create_trend_figure(trend: dict, metric: str) -> go.Figure:
+    """Tendencia semanal con la recta de pendiente coloreada según el estado."""
+    cfg = METRICS[metric]
+    vals = trend.get("values") or []
+    weeks = trend.get("weeks") or []
+    title = f"{cfg['name']} ({cfg['unit']})"
+
+    if len(vals) < 2:
+        return _empty_dark_fig(200, f"{title}: semanas insuficientes")
+
+    color = "#db7b65" if trend.get("adverse") else "#2fc4b2"
+    fig = go.Figure()
+    fig.add_trace(go.Scatter(x=weeks, y=vals, mode="lines+markers",
+                             line=dict(color=cfg["color"], width=2), name=cfg["name"]))
+
+    # Recta de tendencia (sin numpy: a partir de la pendiente guardada).
+    if trend.get("available") and trend.get("slope") is not None:
+        n = len(vals)
+        mean_x = (n - 1) / 2.0
+        mean_y = sum(vals) / n
+        intercept = mean_y - trend["slope"] * mean_x
+        fit = [trend["slope"] * i + intercept for i in range(n)]
+        fig.add_trace(go.Scatter(x=weeks, y=fit, mode="lines",
+                                 line=dict(color=color, width=2, dash="dash"), name="tendencia"))
+
+    fig.update_layout(template="plotly_dark", height=210,
+                      title=dict(text=title, font=dict(size=12)),
+                      margin=dict(l=45, r=15, t=40, b=30), showlegend=False)
+    return fig
+
+
+def trend_badge(trend: dict) -> tuple:
+    """(flecha, color) para la tabla/panel de tendencias."""
+    if not trend.get("available"):
+        return ("—", "#888888")
+    direction = trend.get("direction", "flat")
+    arrow = {"up": "↑", "down": "↓", "flat": "→"}.get(direction, "→")
+    color = "#db7b65" if trend.get("adverse") else "#2fc4b2"
+    return (arrow, color)
 
 
 def calculate_stats(data_dict: dict) -> list[dict]:

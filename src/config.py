@@ -21,6 +21,60 @@ class TimeConfig:
     alarm_cooldown_minutes: int = 60
 CFG = TimeConfig()
 
+
+# ============================================================
+# Configuración del módulo de Análisis (línea base + tendencias)
+# Todos los umbrales son defaults razonables, NO validados clínicamente:
+# se dejan acá para que la tutora / equipo médico los ajusten.
+# ============================================================
+
+# Métricas usadas en el análisis. A propósito NO incluye pasos (el fabricante
+# no garantiza la medición) ni presión (valores acotados a los umbrales).
+ANALYSIS_METRICS = ("heart_rate", "blood_oxygen_saturation", "temperature")
+
+# Límites de plausibilidad por métrica: lecturas fuera de esto se descartan
+# como artefactos (p. ej. temperatura de 10 °C = reloj fuera del cuerpo).
+PLAUSIBILITY = {
+    "heart_rate": (30.0, 200.0),
+    "blood_oxygen_saturation": (70.0, 100.0),
+    "temperature": (28.0, 43.0),
+}
+
+# Dirección clínicamente adversa de la tendencia: +1 = que SUBA es malo,
+# -1 = que BAJE es malo.
+ADVERSE_DIRECTION = {
+    "heart_rate": +1,                # FC en reposo subiendo
+    "blood_oxygen_saturation": -1,   # saturación bajando
+    "temperature": +1,               # temperatura subiendo
+}
+
+# Umbral mínimo de pendiente (por semana) para considerar la tendencia adversa.
+SLOPE_THRESHOLDS = {
+    "heart_rate": 1.5,               # bpm / semana
+    "blood_oxygen_saturation": 0.5,  # % / semana
+    "temperature": 0.1,              # °C / semana
+}
+
+
+@dataclass(frozen=True)
+class AnalyticsConfig:
+    # Línea base personal (percentiles)
+    low_pct: int = 10
+    high_pct: int = 90
+    circadian_bucket_hours: int = 2     # franjas horarias para la banda circadiana
+    baseline_min_readings: int = 200    # mínimo de lecturas para una banda válida
+    baseline_bucket_min: int = 20       # mínimo por franja (si no, usa banda global)
+    # Ventana nocturna para la FC en reposo
+    night_start_hour: int = 0
+    night_end_hour: int = 6
+    night_resting_pct: int = 10         # percentil bajo = "reposo"
+    # Tendencia semanal
+    trend_weeks: int = 4                # semanas a considerar para la pendiente
+    trend_min_weeks: int = 3            # mínimo de semanas con datos para evaluar
+
+
+ACFG = AnalyticsConfig()
+
 IMEI: dict[str, int] = {
     "614": 863269073649284,
     "561": 863269073647767,

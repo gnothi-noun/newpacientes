@@ -11,6 +11,7 @@ def create_navbar():
             dbc.Nav([
                 dbc.NavItem(dbc.NavLink("Dashboard", href="/", active="exact")),
                 dbc.NavItem(dbc.NavLink("Monitor Paciente", href="/patient", active="exact")),
+                dbc.NavItem(dbc.NavLink("Análisis", href="/analisis", active="exact")),
                 dbc.NavItem(dbc.NavLink("Cerrar sesión", href="/logout", external_link=True)),
             ], className="ms-auto", navbar=True)
         ], fluid=True),

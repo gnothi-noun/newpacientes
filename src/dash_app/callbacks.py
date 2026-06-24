@@ -21,11 +21,18 @@ def _format_alarm_range(start, end, count) -> str:
     if start.date() == end.date():
         return f"{start.strftime('%d/%m/%Y')} {start.strftime('%H:%M')} - {end.strftime('%H:%M')}"
     return f"{start.strftime('%d/%m/%Y %H:%M')} - {end.strftime('%d/%m/%Y %H:%M')}"
-from src.dash_app.figures import create_overlaid_figure, create_subplot_figure, create_temperature_alarm_figure, calculate_stats
+import pandas as pd
+from src.dash_app.figures import (
+    create_overlaid_figure, create_subplot_figure, create_temperature_alarm_figure,
+    calculate_stats, create_baseline_figure, create_trend_figure
+)
 from src.dash_app.pages.patient_monitor import create_patient_monitor_layout
 from src.dash_app.pages.dashboard import (
     create_dashboard_layout, create_alerts_panel, create_patients_table
 )
+from src.dash_app.pages.analysis import create_analysis_layout, create_cohort_table
+from src.analytics import get_adverse_cohort, get_patient_analysis, get_clean_series
+from src.config import ANALYSIS_METRICS
 
 
 def register_callbacks(app):
@@ -39,6 +46,8 @@ def register_callbacks(app):
     def display_page(pathname, stored_patient_id):
         if pathname == '/patient':
             return create_patient_monitor_layout(stored_patient_id)
+        elif pathname == '/analisis':
+            return create_analysis_layout(stored_patient_id)
         else:  # "/" or any other path -> Dashboard
             return create_dashboard_layout()
 
@@ -498,3 +507,60 @@ def register_callbacks(app):
 
         pdf_bytes = reports.build_summary_pdf()
         return dcc.send_bytes(lambda buf: buf.write(pdf_bytes), f"{base}.pdf")
+
+    # ==================== ANÁLISIS (línea base + tendencias) ====================
+    @app.callback(
+        Output("analysis-cohort-table", "children"),
+        Input("url", "pathname"),
+    )
+    def populate_analysis_cohort(pathname):
+        if pathname != "/analisis":
+            raise PreventUpdate
+        return create_cohort_table(get_adverse_cohort())
+
+    @app.callback(
+        Output("analysis-baseline-container", "children"),
+        Output("analysis-trend-panel", "children"),
+        Input("analysis-patient-dropdown", "value"),
+        Input("analysis-metrics-checklist", "value"),
+    )
+    def update_analysis_charts(patient_id, metrics):
+        if not patient_id:
+            prompt = dbc.Alert(
+                "Elegí un paciente para ver su línea base y tendencias.",
+                color="secondary", className="text-center",
+            )
+            return prompt, html.Div()
+
+        metrics = [m for m in (metrics or []) if m in ANALYSIS_METRICS]
+        if not metrics:
+            warn = html.Div("Seleccioná al menos una métrica.",
+                            className="text-white p-3")
+            return warn, html.Div()
+
+        analysis = get_patient_analysis(patient_id)
+        info = get_patient_info(patient_id)
+        if not analysis or not info:
+            warn = html.Div("Sin análisis disponible para este paciente.",
+                            className="text-white p-3")
+            return warn, html.Div()
+
+        imei = str(info["imei"])
+        baseline_children = []
+        trend_children = []
+        for m in metrics:
+            # Serie reciente (últimas 2 semanas) para el gráfico de banda personal.
+            df = get_clean_series(imei, m)
+            if not df.empty:
+                cutoff = df["record_datetime"].max() - pd.Timedelta(days=14)
+                df = df[df["record_datetime"] >= cutoff]
+            fig = create_baseline_figure(df, analysis["baselines"][m], m)
+            baseline_children.append(
+                dcc.Graph(figure=fig, config={"displayModeBar": False}, className="mb-3")
+            )
+            trend_children.append(
+                dbc.Col(dcc.Graph(figure=create_trend_figure(analysis["trends"][m], m),
+                                  config={"displayModeBar": False}), md=4, className="mb-2")
+            )
+
+        return baseline_children, dbc.Row(trend_children)

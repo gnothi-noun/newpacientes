@@ -13,6 +13,10 @@ load_all_data()
 # primera visita al dashboard ya es instantánea en vez de tardar varios seg.
 print("Precalculando resumen del dashboard...")
 get_patients_summary()
+# Precaliento el análisis (línea base + tendencias) por la misma razón.
+print("Precalculando análisis de tendencias...")
+from src.analytics import get_analysis_overview
+get_analysis_overview()
 print("Datos cargados.")
 
 app = Dash(
