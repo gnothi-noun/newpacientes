@@ -107,6 +107,22 @@
     background-color: #6f6f6f !important;
 }
 
+/* Hint "deslizá hacia abajo" que aparece al abrir Tendencias y patrones */
+.scroll-hint {
+    color: #ffffff;
+    font-weight: 600;
+    white-space: nowrap;
+    position: absolute;
+    top: 100%;
+    right: 0;
+    margin-top: 6px;
+    animation: bounce-hint 1s ease-in-out infinite;
+}
+@keyframes bounce-hint {
+    0%, 100% { transform: translateY(0); opacity: 1; }
+    50%      { transform: translateY(5px); opacity: 0.35; }
+}
+
 /* Scale down the calendar popup and open to the right of the date box */
 .SingleDatePicker_picker {
     transform: scale(0.55);

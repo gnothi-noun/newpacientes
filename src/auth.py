@@ -23,7 +23,7 @@ USERS_PATH = os.environ.get("VITAICARE_USERS", "users.json")
 SECRET_PATH = os.environ.get("VITAICARE_SECRET", ".flask_secret")
 
 # Rutas accesibles sin estar logueado.
-PUBLIC_PREFIXES = ("/login", "/logout")
+PUBLIC_PREFIXES = ("/login", "/logout", "/assets")
 
 
 # --------------------------- almacén de usuarios ---------------------------
@@ -58,6 +58,16 @@ def delete_user(username: str) -> bool:
         _save_users(users)
         return True
     return False
+
+
+def rename_user(old: str, new: str) -> bool:
+    """Renombra un usuario conservando su contraseña (mueve el hash)."""
+    users = _load_users()
+    if old not in users or new in users:
+        return False
+    users[new] = users.pop(old)
+    _save_users(users)
+    return True
 
 
 def list_users() -> list[str]:
@@ -100,37 +110,61 @@ LOGIN_HTML = """
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>VITAICARE - Ingreso</title>
+  <title>Residencia Asturiana — Ingreso</title>
   <style>
     * { box-sizing: border-box; }
     body { margin:0; min-height:100vh; display:flex; align-items:center;
-           justify-content:center; background:#222; color:#fff;
+           justify-content:center; padding:1rem; color:#fff;
+           background: linear-gradient(160deg, #1c2c3e 0%, #20242a 55%, #181818 100%);
            font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; }
-    .card { background:#303030; padding:2rem 2.25rem; border-radius:8px;
-            width:100%; max-width:340px; box-shadow:0 6px 24px rgba(0,0,0,.4); }
-    h1 { font-size:1.25rem; margin:0 0 1.25rem; text-align:center; }
-    label { display:block; font-size:.85rem; margin:0 0 .25rem; color:#bbb; }
-    input { width:100%; padding:.55rem .65rem; margin-bottom:1rem; border:none;
-            border-radius:4px; background:#454545; color:#fff; font-size:1rem; }
-    button { width:100%; padding:.6rem; border:none; border-radius:4px;
-             background:#375a7f; color:#fff; font-size:1rem; cursor:pointer; }
+    .card { background:#2b2e33; border:1px solid #3a3f45; border-radius:14px;
+            width:100%; max-width:370px; overflow:hidden;
+            box-shadow:0 12px 45px rgba(0,0,0,.5); }
+    .accent { height:5px; background:linear-gradient(90deg,#375a7f,#2fc4b2); }
+    .head { padding:1.9rem 2rem .4rem; text-align:center; }
+    .logo-wrap { width:104px; height:104px; margin:0 auto 1rem; border-radius:50%;
+                 background:#fff; box-shadow:0 3px 14px rgba(0,0,0,.35);
+                 display:flex; align-items:center; justify-content:center; overflow:hidden; }
+    .logo-wrap img { width:100%; height:100%; object-fit:contain; padding:9px; }
+    h1 { font-size:1.25rem; margin:.1rem 0 .2rem; letter-spacing:.2px; }
+    .sub { font-size:.82rem; color:#9fb3c8; margin:0; }
+    form { padding:.6rem 2rem 1.6rem; }
+    label { display:block; font-size:.8rem; margin:.7rem 0 .3rem; color:#aebbc8; }
+    input { width:100%; padding:.62rem .72rem; border:1px solid #3a3f45;
+            border-radius:7px; background:#23262b; color:#fff; font-size:1rem; }
+    input:focus { outline:none; border-color:#375a7f;
+                  box-shadow:0 0 0 3px rgba(55,90,127,.35); }
+    button { width:100%; margin-top:1.35rem; padding:.68rem; border:none;
+             border-radius:7px; background:#375a7f; color:#fff; font-size:1rem;
+             font-weight:600; cursor:pointer; transition:background .15s; }
     button:hover { background:#2b4763; }
     .error { background:#5a2b2b; border:1px solid #8b3a3a; color:#ffd5d5;
-             padding:.55rem .65rem; border-radius:4px; margin-bottom:1rem;
+             padding:.55rem .65rem; border-radius:7px; margin-top:.9rem;
              font-size:.85rem; text-align:center; }
+    .foot { text-align:center; font-size:.72rem; color:#7d8794; padding:0 2rem 1.3rem; }
   </style>
 </head>
 <body>
-  <form class="card" method="post" action="/login">
-    <h1>Residencia Asturiana</h1>
-    {% if error %}<div class="error">{{ error }}</div>{% endif %}
-    <label for="username">Usuario</label>
-    <input id="username" name="username" autocomplete="username" autofocus required>
-    <label for="password">Contraseña</label>
-    <input id="password" name="password" type="password"
-           autocomplete="current-password" required>
-    <button type="submit">Ingresar</button>
-  </form>
+  <div class="card">
+    <div class="accent"></div>
+    <div class="head">
+      <div class="logo-wrap">
+        <img src="/assets/logo-asturiana.jpeg" alt="Residencia Asturiana">
+      </div>
+      <h1>Residencia Asturiana</h1>
+      <p class="sub">VITAICARE · Monitoreo de pacientes</p>
+    </div>
+    <form method="post" action="/login">
+      {% if error %}<div class="error">{{ error }}</div>{% endif %}
+      <label for="username">Usuario</label>
+      <input id="username" name="username" autocomplete="username" autofocus required>
+      <label for="password">Contraseña</label>
+      <input id="password" name="password" type="password"
+             autocomplete="current-password" required>
+      <button type="submit">Ingresar</button>
+    </form>
+    <div class="foot">Acceso exclusivo del equipo médico</div>
+  </div>
 </body>
 </html>
 """

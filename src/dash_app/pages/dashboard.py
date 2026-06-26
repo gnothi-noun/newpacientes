@@ -14,23 +14,6 @@ def _fmt_gap(hours) -> str:
     return f"{int(round(hours))} h"
 
 
-def create_no_data_panel(no_data_patients: list[dict]):
-    """Alerta de pacientes cuyo reloj dejó de transmitir (sin datos > umbral)."""
-    if not no_data_patients:
-        return None
-    items = ", ".join(
-        f"{p['patient_id']} ({_fmt_gap(p.get('hours_since_last'))})"
-        for p in no_data_patients
-    )
-    return dbc.Alert(
-        [
-            html.Strong(f"{len(no_data_patients)} paciente(s) sin datos hace más de 24 h: "),
-            html.Span(items),
-        ],
-        color="warning", className="mb-3",
-    )
-
-
 def create_alert_card(patient: dict) -> dbc.Card | None:
     """Create an alert card for a patient with alerts."""
     alerts: list[Alarm] = patient["alerts"]
@@ -191,7 +174,10 @@ def create_dashboard_layout():
 
 
 def create_alerts_panel(patients_with_alerts: list[dict]):
-    """Create the alerts panel with patient cards."""
+    """Panel de alertas con tarjetas (solo alarmas de valor).
+
+    Las alarmas de 'sin datos' NO van acá: se muestran solo en la tabla resumen.
+    """
     if not patients_with_alerts:
         return dbc.Alert(
             "No hay alertas activas en los ultimos 7 dias",

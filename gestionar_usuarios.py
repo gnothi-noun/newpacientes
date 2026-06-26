@@ -16,7 +16,7 @@ import argparse
 import getpass
 import sys
 
-from src.auth import add_user, delete_user, list_users, user_exists
+from src.auth import add_user, delete_user, list_users, user_exists, rename_user
 
 
 def _cmd_add(username: str) -> int:
@@ -54,6 +54,18 @@ def _cmd_delete(username: str) -> int:
     return 1
 
 
+def _cmd_rename(old: str, new: str) -> int:
+    if not user_exists(old):
+        print(f"No existe el usuario '{old}'.")
+        return 1
+    if user_exists(new):
+        print(f"Ya existe un usuario '{new}'. Elegi otro nombre.")
+        return 1
+    rename_user(old, new)
+    print(f"Usuario '{old}' renombrado a '{new}' (conserva su contrasena).")
+    return 0
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="Gestion de usuarios de VITAICARE.")
     sub = parser.add_subparsers(dest="cmd", required=True)
@@ -66,6 +78,10 @@ def main() -> int:
     p_del = sub.add_parser("delete", help="Eliminar un usuario.")
     p_del.add_argument("username")
 
+    p_ren = sub.add_parser("rename", help="Renombrar un usuario (conserva la contrasena).")
+    p_ren.add_argument("old", help="nombre actual")
+    p_ren.add_argument("new", help="nombre nuevo")
+
     args = parser.parse_args()
 
     if args.cmd == "add":
@@ -74,6 +90,8 @@ def main() -> int:
         return _cmd_list()
     if args.cmd == "delete":
         return _cmd_delete(args.username)
+    if args.cmd == "rename":
+        return _cmd_rename(args.old, args.new)
     return 1
 
 

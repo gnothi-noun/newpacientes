@@ -10,7 +10,8 @@ def create_navbar():
             dbc.NavbarBrand("Residencia Asturiana", href="/", className="ms-2"),
             dbc.Nav([
                 dbc.NavItem(dbc.NavLink("Dashboard", href="/", active="exact")),
-                dbc.NavItem(dbc.NavLink("Monitor Paciente", href="/patient", active="exact")),
+                dbc.NavItem(dbc.NavLink("Monitor Paciente", id="nav-monitor-link",
+                                        n_clicks=0, style={"cursor": "pointer"})),
                 dbc.NavItem(dbc.NavLink("Cerrar sesión", href="/logout", external_link=True)),
             ], className="ms-auto", navbar=True)
         ], fluid=True),

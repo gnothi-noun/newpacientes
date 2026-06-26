@@ -13,10 +13,9 @@ def create_patient_monitor_layout(selected_patient_id=None):
         for _, row in patients.iterrows()
     ]
 
-    # Use selected patient if provided, otherwise default to first
-    default_patient = selected_patient_id if selected_patient_id else (
-        patient_options[0]["value"] if patient_options else None
-    )
+    # Solo preselecciona si se navegó a un paciente puntual (alarma/fila);
+    # si no hay paciente (p. ej. desde "Monitor Paciente"), el dropdown va vacío.
+    default_patient = selected_patient_id
 
     metric_options = [
         {"label": cfg["name"], "value": key}
@@ -33,6 +32,7 @@ def create_patient_monitor_layout(selected_patient_id=None):
             id="patient-dropdown",
             options=patient_options,
             value=default_patient,
+            placeholder="Buscá un paciente…",
             clearable=False,
             style={
                 "backgroundColor": "#ff8a65",
@@ -119,19 +119,20 @@ def create_patient_monitor_layout(selected_patient_id=None):
         # Tarjetas de estadística + botón de análisis a la derecha de la última.
         html.Div([
             html.Div(id="stats-panel"),
-            dbc.Button("Tendencias y patrones", id="deep-analysis-btn", color="primary",
-                       className="ms-3 flex-shrink-0 align-self-start", n_clicks=0),
+            html.Div([
+                dbc.Button("Tendencias y patrones", id="deep-analysis-btn",
+                           color="primary", n_clicks=0),
+                # Posicionado absoluto: aparece sin empujar las tarjetas.
+                html.Div("Deslizá hacia abajo ⬇", id="deep-analysis-hint",
+                         className="scroll-hint", style={"display": "none"}),
+            ], className="ms-3 flex-shrink-0 align-self-start position-relative"),
         ], className="d-flex align-items-start mb-3"),
-        html.Div(
-            dcc.Loading(
-                id="loading",
-                type="circle",
-                children=[
-                    dcc.Graph(id="main-graph", style={"height": "58vh"},
-                              config={"responsive": True}),
-                ]
-            ),
-            style={"overflow": "hidden"},
+        dcc.Loading(
+            id="loading",
+            type="circle",
+            children=[
+                dcc.Graph(id="main-graph", config={"responsive": True}, className="mb-2"),
+            ]
         ),
 
         # Sección de Análisis (se abre/cierra con el botón "Análisis" del panel lateral).

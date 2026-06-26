@@ -25,12 +25,11 @@ import pandas as pd
 from src.dash_app.figures import (
     create_overlaid_figure, create_subplot_figure, create_temperature_alarm_figure,
     calculate_stats, create_baseline_figure, create_trend_figure,
-    create_gauge_figure, create_heatmap_figure
+    create_gauge_figure, create_heatmap_figure, _empty_dark_fig
 )
 from src.dash_app.pages.patient_monitor import create_patient_monitor_layout
 from src.dash_app.pages.dashboard import (
-    create_dashboard_layout, create_alerts_panel, create_patients_table,
-    create_no_data_panel
+    create_dashboard_layout, create_alerts_panel, create_patients_table
 )
 from src.analytics import get_patient_analysis, get_clean_series
 from src.config import ANALYSIS_METRICS
@@ -50,6 +49,20 @@ def register_callbacks(app):
         else:  # "/" or any other path -> Dashboard
             return create_dashboard_layout()
 
+    # "Monitor Paciente" del navbar: abre el monitor SIN paciente preseleccionado
+    # (limpia la selección para que el usuario busque). Clickear una alarma o
+    # fila del dashboard sí preselecciona, porque setea el store después.
+    @app.callback(
+        Output('url', 'pathname', allow_duplicate=True),
+        Output('selected-patient-store', 'data', allow_duplicate=True),
+        Input('nav-monitor-link', 'n_clicks'),
+        prevent_initial_call=True,
+    )
+    def open_monitor_empty(n_clicks):
+        if not n_clicks:
+            raise PreventUpdate
+        return '/patient', None
+
     # ==================== DASHBOARD CALLBACKS ====================
     @app.callback(
         Output('alerts-section', 'children'),
@@ -63,15 +76,9 @@ def register_callbacks(app):
         # Get all patients summary
         all_patients = get_patients_summary()
         patients_with_alerts = get_patients_with_alerts()
-        no_data_patients = [p for p in all_patients if p.get("no_data_alert")]
 
-        # Create components: panel de "sin datos" (si hay) + alertas de valor
-        sections = []
-        nd_panel = create_no_data_panel(no_data_patients)
-        if nd_panel:
-            sections.append(nd_panel)
-        sections.append(create_alerts_panel(patients_with_alerts))
-        alerts_panel = html.Div(sections)
+        # Las alarmas de "sin datos" se ven solo en la tabla resumen (no en cards).
+        alerts_panel = create_alerts_panel(patients_with_alerts)
         patients_table = create_patients_table(all_patients)
 
         return alerts_panel, patients_table
@@ -212,7 +219,9 @@ def register_callbacks(app):
     )
     def update_graph(patient_id, date_start, date_end, time_start, time_end, metrics, view_mode, alarm_context):
         if not patient_id or not date_start or not date_end:
-            return {}, html.Div("Selecciona paciente y fechas", className="bg-dark text-white")
+            msg = ("Todavía no se seleccionó un paciente"
+                   if not patient_id else "Seleccioná un rango de fechas")
+            return _empty_dark_fig(420, msg), html.Div()
 
         # Hidden graph used for warning states
         hidden_graph = {
@@ -515,12 +524,15 @@ def register_callbacks(app):
     # ============= ANÁLISIS MÁS PROFUNDO (dentro de Monitor Paciente) =============
     @app.callback(
         Output("deep-analysis-collapse", "is_open"),
+        Output("deep-analysis-hint", "style"),
         Input("deep-analysis-btn", "n_clicks"),
         State("deep-analysis-collapse", "is_open"),
         prevent_initial_call=True,
     )
     def toggle_deep_analysis(n_clicks, is_open):
-        return not is_open
+        new_open = not is_open
+        hint_style = {"display": "inline-block"} if new_open else {"display": "none"}
+        return new_open, hint_style
 
     @app.callback(
         Output("deep-analysis-content", "children"),

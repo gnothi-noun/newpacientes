@@ -60,6 +60,7 @@ def create_overlaid_figure(data_dict: dict, alarm: Alarm | None = None) -> go.Fi
 
     layout_kwargs = dict(
         template="plotly_dark",
+        height=460,
         hovermode="x unified",
         legend=dict(orientation="h", yanchor="bottom", y=1.02),
         margin=dict(l=60, r=20, t=40, b=60),
