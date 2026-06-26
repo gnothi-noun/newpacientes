@@ -209,11 +209,29 @@ def get_patients_summary() -> list[dict]:
     now = pd.Timestamp.now(tz="America/Argentina/Buenos_Aires")
     week_ago = now - pd.Timedelta(days=7)
 
+    # Alarma "sin datos": referencia = dato más reciente del sistema (no now(),
+    # porque los datos son históricos). Un paciente cuyo último registro quedó
+    # más de CFG.no_data_hours por detrás del dato más fresco del sistema => su
+    # reloj dejó de transmitir.
+    latest_overall = wearable_df["record_datetime"].max()
+    last_by_imei = wearable_df.groupby("imei")["record_datetime"].max()
+    no_data_cutoff = pd.Timedelta(hours=CFG.no_data_hours)
+
     summary: list[dict] = []
 
     for _, patient in patients_df.iterrows():
         patient_id = str(patient["patient_id"])
         imei = str(patient["imei"])
+
+        last_seen = last_by_imei.get(imei)
+        if last_seen is None or pd.isna(last_seen):
+            last_seen = None
+            hours_since_last = None
+            no_data_alert = True  # nunca transmitió
+        else:
+            gap = latest_overall - last_seen
+            hours_since_last = gap.total_seconds() / 3600.0
+            no_data_alert = gap > no_data_cutoff
 
         patient_data = wearable_df[
             (wearable_df["imei"] == imei) &
@@ -272,6 +290,9 @@ def get_patients_summary() -> list[dict]:
             "genre": patient.get("genre", ""),
             "alerts": dashboard_alarms,
             "metrics": metrics_summary,
+            "last_seen": last_seen,
+            "hours_since_last": hours_since_last,
+            "no_data_alert": no_data_alert,
         })
 
     return summary

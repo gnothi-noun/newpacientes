@@ -144,6 +144,9 @@ function Invoke-TarScpDeploy {
     foreach ($p in @("RA_patients.parquet", "RA_wearable.parquet")) {
         if (Test-Path (Join-Path $RepoRoot $p)) { $files += $p }
     }
+    # Descartar archivos que git lista pero que ya no existen en disco (borrados
+    # pero aun en el indice) para que tar no falle.
+    $files = @($files | Where-Object { Test-Path (Join-Path $RepoRoot $_) })
     if (-not $files -or $files.Count -eq 0) { throw "No se encontraron archivos para enviar." }
 
     Write-Host "    $($files.Count) archivos a enviar -> $Remote" -ForegroundColor DarkGray

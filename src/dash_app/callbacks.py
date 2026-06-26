@@ -24,14 +24,15 @@ def _format_alarm_range(start, end, count) -> str:
 import pandas as pd
 from src.dash_app.figures import (
     create_overlaid_figure, create_subplot_figure, create_temperature_alarm_figure,
-    calculate_stats, create_baseline_figure, create_trend_figure
+    calculate_stats, create_baseline_figure, create_trend_figure,
+    create_gauge_figure, create_heatmap_figure
 )
 from src.dash_app.pages.patient_monitor import create_patient_monitor_layout
 from src.dash_app.pages.dashboard import (
-    create_dashboard_layout, create_alerts_panel, create_patients_table
+    create_dashboard_layout, create_alerts_panel, create_patients_table,
+    create_no_data_panel
 )
-from src.dash_app.pages.analysis import create_analysis_layout, create_cohort_table
-from src.analytics import get_adverse_cohort, get_patient_analysis, get_clean_series
+from src.analytics import get_patient_analysis, get_clean_series
 from src.config import ANALYSIS_METRICS
 
 
@@ -46,8 +47,6 @@ def register_callbacks(app):
     def display_page(pathname, stored_patient_id):
         if pathname == '/patient':
             return create_patient_monitor_layout(stored_patient_id)
-        elif pathname == '/analisis':
-            return create_analysis_layout(stored_patient_id)
         else:  # "/" or any other path -> Dashboard
             return create_dashboard_layout()
 
@@ -64,9 +63,15 @@ def register_callbacks(app):
         # Get all patients summary
         all_patients = get_patients_summary()
         patients_with_alerts = get_patients_with_alerts()
+        no_data_patients = [p for p in all_patients if p.get("no_data_alert")]
 
-        # Create components
-        alerts_panel = create_alerts_panel(patients_with_alerts)
+        # Create components: panel de "sin datos" (si hay) + alertas de valor
+        sections = []
+        nd_panel = create_no_data_panel(no_data_patients)
+        if nd_panel:
+            sections.append(nd_panel)
+        sections.append(create_alerts_panel(patients_with_alerts))
+        alerts_panel = html.Div(sections)
         patients_table = create_patients_table(all_patients)
 
         return alerts_panel, patients_table
@@ -291,18 +296,17 @@ def register_callbacks(app):
         if not stats:
             return fig, html.Div()
 
-        stats_content = dbc.Row([
-            dbc.Col([
-                dbc.Card([
-                    dbc.CardBody([
-                        html.H6(s["metric"], className="mb-2", style={"fontWeight": "bold", "fontSize": "1.1rem"}),
-                        html.P(f"Min: {s['min']:.1f} {s['unit']}", className="mb-1 small"),
-                        html.P(f"Max: {s['max']:.1f} {s['unit']}", className="mb-1 small"),
-                        html.P(f"Prom: {s['avg']:.1f} {s['unit']}", className="mb-0 small")
-                    ], className="p-2")
-                ], className="text-white", style={"backgroundColor": "#6f6f6f", "border": "none"})
-            ], width=2, className="mb-2") for s in stats
-        ])
+        stats_content = html.Div([
+            dbc.Card([
+                dbc.CardBody([
+                    html.H6(s["metric"], className="mb-2", style={"fontWeight": "bold", "fontSize": "1.05rem"}),
+                    html.P(f"Min: {s['min']:.1f} {s['unit']}", className="mb-1 small"),
+                    html.P(f"Max: {s['max']:.1f} {s['unit']}", className="mb-1 small"),
+                    html.P(f"Prom: {s['avg']:.1f} {s['unit']}", className="mb-0 small")
+                ], className="p-2")
+            ], className="text-white", style={"backgroundColor": "#6f6f6f", "border": "none", "width": "155px"})
+            for s in stats
+        ], className="d-flex flex-wrap gap-2")
 
         return fig, stats_content
 
@@ -508,59 +512,79 @@ def register_callbacks(app):
         pdf_bytes = reports.build_summary_pdf()
         return dcc.send_bytes(lambda buf: buf.write(pdf_bytes), f"{base}.pdf")
 
-    # ==================== ANÁLISIS (línea base + tendencias) ====================
+    # ============= ANÁLISIS MÁS PROFUNDO (dentro de Monitor Paciente) =============
     @app.callback(
-        Output("analysis-cohort-table", "children"),
-        Input("url", "pathname"),
+        Output("deep-analysis-collapse", "is_open"),
+        Input("deep-analysis-btn", "n_clicks"),
+        State("deep-analysis-collapse", "is_open"),
+        prevent_initial_call=True,
     )
-    def populate_analysis_cohort(pathname):
-        if pathname != "/analisis":
+    def toggle_deep_analysis(n_clicks, is_open):
+        return not is_open
+
+    @app.callback(
+        Output("deep-analysis-content", "children"),
+        Input("deep-analysis-collapse", "is_open"),
+        Input("patient-dropdown", "value"),
+        prevent_initial_call=True,
+    )
+    def update_deep_analysis(is_open, patient_id):
+        # Solo calcula cuando la sección está abierta (evita trabajo si está oculta).
+        if not is_open:
             raise PreventUpdate
-        return create_cohort_table(get_adverse_cohort())
-
-    @app.callback(
-        Output("analysis-baseline-container", "children"),
-        Output("analysis-trend-panel", "children"),
-        Input("analysis-patient-dropdown", "value"),
-        Input("analysis-metrics-checklist", "value"),
-    )
-    def update_analysis_charts(patient_id, metrics):
         if not patient_id:
-            prompt = dbc.Alert(
-                "Elegí un paciente para ver su línea base y tendencias.",
-                color="secondary", className="text-center",
-            )
-            return prompt, html.Div()
-
-        metrics = [m for m in (metrics or []) if m in ANALYSIS_METRICS]
-        if not metrics:
-            warn = html.Div("Seleccioná al menos una métrica.",
-                            className="text-white p-3")
-            return warn, html.Div()
+            return dbc.Alert("Seleccioná un paciente.", color="secondary", className="text-center")
 
         analysis = get_patient_analysis(patient_id)
         info = get_patient_info(patient_id)
         if not analysis or not info:
-            warn = html.Div("Sin análisis disponible para este paciente.",
-                            className="text-white p-3")
-            return warn, html.Div()
+            return dbc.Alert("Sin análisis disponible para este paciente.",
+                             color="secondary", className="text-center")
 
         imei = str(info["imei"])
-        baseline_children = []
+        gauge_children = []
         trend_children = []
-        for m in metrics:
-            # Serie reciente (últimas 2 semanas) para el gráfico de banda personal.
-            df = get_clean_series(imei, m)
-            if not df.empty:
-                cutoff = df["record_datetime"].max() - pd.Timedelta(days=14)
-                df = df[df["record_datetime"] >= cutoff]
-            fig = create_baseline_figure(df, analysis["baselines"][m], m)
-            baseline_children.append(
-                dcc.Graph(figure=fig, config={"displayModeBar": False}, className="mb-3")
-            )
-            trend_children.append(
-                dbc.Col(dcc.Graph(figure=create_trend_figure(analysis["trends"][m], m),
-                                  config={"displayModeBar": False}), md=4, className="mb-2")
+        heatmap_children = []
+        for m in ANALYSIS_METRICS:
+            baseline = analysis["baselines"][m]
+            full = get_clean_series(imei, m)  # serie completa limpia (cacheada)
+
+            # --- Gauge: valor actual vs banda usual (overall p10–p90) ---
+            latest = float(full["value"].iloc[-1]) if not full.empty else None
+            axis = None
+            if not full.empty:
+                amin = float(full["value"].quantile(0.02))
+                amax = float(full["value"].quantile(0.98))
+                if latest is not None:
+                    amin, amax = min(amin, latest), max(amax, latest)
+                if amax > amin:
+                    axis = (amin, amax)
+            band = baseline["overall"] if baseline.get("available") else None
+            gauge_children.append(
+                dbc.Col(dcc.Graph(figure=create_gauge_figure(m, latest, band, axis),
+                                  config={"displayModeBar": False, "responsive": True}), md=4)
             )
 
-        return baseline_children, dbc.Row(trend_children)
+            # --- Tendencia semanal ---
+            trend_children.append(
+                dbc.Col(dcc.Graph(figure=create_trend_figure(analysis["trends"][m], m),
+                                  config={"displayModeBar": False, "responsive": True}),
+                        md=4, className="mb-2")
+            )
+
+            # --- Mapa de calor día × hora (últimos 30 días) ---
+            heatmap_children.append(
+                dcc.Graph(figure=create_heatmap_figure(full, m),
+                          config={"displayModeBar": False, "responsive": True}, className="mb-3")
+            )
+
+        return html.Div([
+            html.H5("Estado actual (valor vs su rango usual)", className="mb-2 mt-2"),
+            dbc.Row(gauge_children),
+
+            html.H5("Tendencias semanales (alerta temprana)", className="mt-3 mb-2"),
+            dbc.Row(trend_children),
+
+            html.H5("Patrón por hora y día (últimos 30 días)", className="mt-3 mb-2"),
+            *heatmap_children,
+        ])

@@ -1,4 +1,5 @@
 from __future__ import annotations
+import pandas as pd
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 from src.config import METRICS, Alarm, ACFG
@@ -117,7 +118,7 @@ def create_subplot_figure(data_dict: dict, alarm: Alarm | None = None) -> go.Fig
 
     fig.update_layout(
         template="plotly_dark",
-        height=200 * n,
+        height=180 * n,
         showlegend=False,
         margin=dict(l=60, r=20, t=40, b=40)
     )
@@ -181,7 +182,7 @@ def create_temperature_alarm_figure(data_dict: dict, alarm: Alarm) -> go.Figure:
 
     fig.update_layout(
         template="plotly_dark",
-        height=300 * n_rows,
+        height=270 * n_rows,
         showlegend=True,
         legend=dict(orientation="h", yanchor="middle", y=0.48, xanchor="center", x=0.5),
         margin=dict(l=60, r=20, t=40, b=40)
@@ -271,6 +272,78 @@ def create_trend_figure(trend: dict, metric: str) -> go.Figure:
     fig.update_layout(template="plotly_dark", height=210,
                       title=dict(text=title, font=dict(size=12)),
                       margin=dict(l=45, r=15, t=40, b=30), showlegend=False)
+    return fig
+
+
+def create_gauge_figure(metric: str, value, band, axis_range) -> go.Figure:
+    """Medidor: valor actual del paciente sobre su banda usual (p10–p90).
+
+    La franja verde es el rango usual del paciente; la aguja (threshold) marca el
+    valor actual, en verde si está dentro de su patrón o naranja si se sale.
+    """
+    cfg = METRICS[metric]
+    if value is None or band is None or axis_range is None:
+        return _empty_dark_fig(200, f"{cfg['name']}: sin dato actual")
+
+    lo, hi = band
+    amin, amax = axis_range
+    in_band = lo <= value <= hi
+    color = "#2fc4b2" if in_band else "#db7b65"
+
+    fig = go.Figure(go.Indicator(
+        mode="gauge+number",
+        value=round(float(value), 1),
+        number={"suffix": f" {cfg['unit']}", "font": {"size": 22, "color": color}},
+        title={"text": cfg["name"], "font": {"size": 13}},
+        gauge={
+            "axis": {"range": [amin, amax], "tickfont": {"size": 9}},
+            "bar": {"color": "rgba(0,0,0,0)", "thickness": 0},   # sin barra de relleno
+            "steps": [
+                {"range": [amin, lo], "color": "#444444"},
+                {"range": [lo, hi], "color": "rgba(47,196,178,0.5)"},  # rango usual
+                {"range": [hi, amax], "color": "#444444"},
+            ],
+            "threshold": {"line": {"color": color, "width": 4}, "thickness": 0.85, "value": float(value)},
+        },
+    ))
+    fig.update_layout(template="plotly_dark", height=200, margin=dict(l=20, r=20, t=45, b=10))
+    return fig
+
+
+def create_heatmap_figure(df, metric: str, days: int = 30) -> go.Figure:
+    """Mapa de calor del patrón circadiano: filas = días, columnas = hora del día,
+    color = valor promedio. Resalta noches/horas atípicas de un vistazo."""
+    cfg = METRICS[metric]
+    if df is None or df.empty:
+        return _empty_dark_fig(280, f"{cfg['name']}: sin datos")
+
+    d = df[["record_datetime", "value"]].copy()
+    cutoff = d["record_datetime"].max() - pd.Timedelta(days=days)
+    d = d[d["record_datetime"] >= cutoff]
+    if d.empty:
+        return _empty_dark_fig(280, f"{cfg['name']}: sin datos recientes")
+
+    d["dia"] = d["record_datetime"].dt.date
+    d["hora"] = d["record_datetime"].dt.hour
+    pivot = d.pivot_table(index="dia", columns="hora", values="value", aggfunc="mean")
+    pivot = pivot.reindex(columns=range(24)).sort_index()
+
+    fig = go.Figure(go.Heatmap(
+        z=pivot.values,
+        x=[f"{h:02d}" for h in pivot.columns],
+        y=[dia.strftime("%d/%m") for dia in pivot.index],
+        colorscale="Viridis",
+        colorbar={"title": cfg["unit"], "thickness": 12},
+        hovertemplate="%{y} · %{x}:00 hs<br>%{z:.1f} " + cfg["unit"] + "<extra></extra>",
+    ))
+    fig.update_layout(
+        template="plotly_dark",
+        height=max(280, 14 * len(pivot) + 90),
+        title={"text": f"{cfg['name']} — patrón por hora y día", "font": {"size": 12}},
+        margin=dict(l=55, r=20, t=40, b=35),
+        xaxis_title="Hora del día",
+        yaxis=dict(autorange="reversed"),  # día más reciente arriba
+    )
     return fig
 
 

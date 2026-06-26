@@ -19,6 +19,9 @@ class TimeConfig:
     # Enfriamiento de alarmas: tras disparar una alarma de una métrica+tipo,
     # se ignoran nuevas alarmas de esa misma métrica+tipo hasta que pase esto.
     alarm_cooldown_minutes: int = 60
+    # Alarma de "sin datos": horas sin registros para considerar que el reloj
+    # dejó de transmitir (medido respecto del dato más reciente del sistema).
+    no_data_hours: int = 24
 CFG = TimeConfig()
 
 

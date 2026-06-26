@@ -44,41 +44,35 @@ def create_patient_monitor_layout(selected_patient_id=None):
 
         html.Hr(),
 
-        html.Label("Fecha Inicio"),
-        html.Div(dcc.DatePickerSingle(id="date-start", display_format="DD/MM/YYYY"), className="d-block mb-2"),
-
-        html.Label("Fecha Fin"),
-        html.Div(dcc.DatePickerSingle(id="date-end", display_format="DD/MM/YYYY"), className="d-block"),
+        dbc.Row([
+            dbc.Col([
+                html.Label("Fecha Inicio", className="small mb-1 d-block"),
+                dcc.DatePickerSingle(id="date-start", display_format="DD/MM/YYYY"),
+            ], width=6),
+            dbc.Col([
+                html.Label("Fecha Fin", className="small mb-1 d-block"),
+                dcc.DatePickerSingle(id="date-end", display_format="DD/MM/YYYY"),
+            ], width=6),
+        ], className="g-2"),
 
         html.Hr(),
 
-        html.Label("Hora Inicio"),
-        dcc.Dropdown(
-            id="time-start",
-            options=hour_options,
-            value=0,
-            clearable=False,
-            style={
-                "backgroundColor": "#6f6f6f",
-                "color": "white",
-                "width": "100px",
-                "fontSize": "14px",
-            }
-        ),
-
-        html.Label("Hora Fin", className="mt-2"),
-        dcc.Dropdown(
-            id="time-end",
-            options=hour_options,
-            value=23,
-            clearable=False,
-            style={
-                "backgroundColor": "#6f6f6f",
-                "color": "white",
-                "width": "100px",
-                "fontSize": "14px",
-            }
-        ),
+        dbc.Row([
+            dbc.Col([
+                html.Label("Hora Inicio", className="small mb-1"),
+                dcc.Dropdown(
+                    id="time-start", options=hour_options, value=0, clearable=False,
+                    style={"backgroundColor": "#6f6f6f", "color": "white", "fontSize": "13px"},
+                ),
+            ], width=6),
+            dbc.Col([
+                html.Label("Hora Fin", className="small mb-1"),
+                dcc.Dropdown(
+                    id="time-end", options=hour_options, value=23, clearable=False,
+                    style={"backgroundColor": "#6f6f6f", "color": "white", "fontSize": "13px"},
+                ),
+            ], width=6),
+        ], className="g-2"),
 
         html.Hr(),
 
@@ -122,14 +116,30 @@ def create_patient_monitor_layout(selected_patient_id=None):
     ], width=3, className="bg-dark p-3", style={"height": "calc(100vh - 56px)", "overflowY": "auto"})
 
     main_content = dbc.Col([
-        html.Div(id="stats-panel", className="mb-3"),
-        dcc.Loading(
-            id="loading",
-            type="circle",
-            children=[
-                dcc.Graph(id="main-graph", style={"height": "65vh"}),
-            ]
-        )
+        # Tarjetas de estadística + botón de análisis a la derecha de la última.
+        html.Div([
+            html.Div(id="stats-panel"),
+            dbc.Button("Tendencias y patrones", id="deep-analysis-btn", color="primary",
+                       className="ms-3 flex-shrink-0 align-self-start", n_clicks=0),
+        ], className="d-flex align-items-start mb-3"),
+        html.Div(
+            dcc.Loading(
+                id="loading",
+                type="circle",
+                children=[
+                    dcc.Graph(id="main-graph", style={"height": "58vh"},
+                              config={"responsive": True}),
+                ]
+            ),
+            style={"overflow": "hidden"},
+        ),
+
+        # Sección de Análisis (se abre/cierra con el botón "Análisis" del panel lateral).
+        dbc.Collapse(
+            dcc.Loading(type="circle", children=html.Div(id="deep-analysis-content")),
+            id="deep-analysis-collapse",
+            is_open=False,
+        ),
     ], width=9, className="p-3")
 
     return dbc.Container([

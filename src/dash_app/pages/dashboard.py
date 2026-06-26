@@ -5,6 +5,32 @@ import dash_bootstrap_components as dbc
 from src.config import METRICS, Alarm
 
 
+def _fmt_gap(hours) -> str:
+    """Formato legible del tiempo sin datos."""
+    if hours is None:
+        return "sin registros"
+    if hours >= 48:
+        return f"{int(hours // 24)} días"
+    return f"{int(round(hours))} h"
+
+
+def create_no_data_panel(no_data_patients: list[dict]):
+    """Alerta de pacientes cuyo reloj dejó de transmitir (sin datos > umbral)."""
+    if not no_data_patients:
+        return None
+    items = ", ".join(
+        f"{p['patient_id']} ({_fmt_gap(p.get('hours_since_last'))})"
+        for p in no_data_patients
+    )
+    return dbc.Alert(
+        [
+            html.Strong(f"{len(no_data_patients)} paciente(s) sin datos hace más de 24 h: "),
+            html.Span(items),
+        ],
+        color="warning", className="mb-3",
+    )
+
+
 def create_alert_card(patient: dict) -> dbc.Card | None:
     """Create an alert card for a patient with alerts."""
     alerts: list[Alarm] = patient["alerts"]
@@ -61,7 +87,12 @@ def create_patient_row(patient: dict) -> html.Tr:
 
     # Alert indicator
     alert_count = len(patient["alerts"])
-    if alert_count > 0:
+    if patient.get("no_data_alert"):
+        status = html.Span(
+            f"Sin datos ({_fmt_gap(patient.get('hours_since_last'))})",
+            className="badge text-white", style={"backgroundColor": "#8a8a8a"}
+        )
+    elif alert_count > 0:
         status = dbc.Button(
             f"{alert_count} alerta(s)",
             id={"type": "alert-badge", "patient_id": patient["patient_id"]},

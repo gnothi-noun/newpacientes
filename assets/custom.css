@@ -94,10 +94,6 @@
 
 #time-start .Select-menu-outer,
 #time-end .Select-menu-outer {
-    position: absolute !important;
-    left: 100% !important;
-    top: 0 !important;
-    width: 100px !important;
     background-color: #6f6f6f !important;
 }
 
@@ -116,5 +112,14 @@
     transform: scale(0.55);
     transform-origin: top left;
     left: 100% !important;
+    top: 0 !important;
+}
+
+/* Fecha Fin: abrir el calendario hacia la IZQUIERDA (si no, queda tapado). */
+#date-end .SingleDatePicker_picker {
+    transform: scale(0.55) !important;
+    transform-origin: top right !important;
+    left: auto !important;
+    right: 100% !important;
     top: 0 !important;
 }

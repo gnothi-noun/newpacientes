@@ -9,8 +9,9 @@
 **Tutor:** Dr. Miguel Aguirre (ITBA)
 **Co-tutora:** Ing. Melisa Granda (UAH)
 **Colaboradora:** Giuliana Espósito
-**Fecha:** Enero 2026
+**Última actualización:** 24 de junio de 2026
 **Período de Desarrollo:** Noviembre 2024 - Abril 2025
+**Versión del documento:** 2.0
 
 ---
 
@@ -20,31 +21,51 @@
 2. [Contexto del Proyecto](#2-contexto-del-proyecto)
 3. [Objetivos del Proyecto](#3-objetivos-del-proyecto)
 4. [Arquitectura del Sistema](#4-arquitectura-del-sistema)
-5. [Tecnologías Implementadas](#5-tecnologías-implementadas)
-6. [Estructura del Código](#6-estructura-del-código)
-7. [Fuentes de Datos](#7-fuentes-de-datos)
-8. [Componentes de Visualización](#8-componentes-de-visualización)
-9. [Funcionalidades Implementadas](#9-funcionalidades-implementadas)
-10. [Desafíos Técnicos y Soluciones](#10-desafíos-técnicos-y-soluciones)
-11. [Resultados y Estado Actual](#11-resultados-y-estado-actual)
-12. [Trabajo Futuro](#12-trabajo-futuro)
-13. [Conclusiones](#13-conclusiones)
-14. [Referencias y Recursos](#14-referencias-y-recursos)
+5. [Pipeline de Datos (SQL → JSON → Parquet → App)](#5-pipeline-de-datos)
+6. [Tecnologías Implementadas](#6-tecnologías-implementadas)
+7. [Configuración Centralizada (`config.py`)](#7-configuración-centralizada)
+8. [Fuentes y Realidad de los Datos](#8-fuentes-y-realidad-de-los-datos)
+9. [Sistema de Alarmas](#9-sistema-de-alarmas)
+10. [Módulo de Análisis: Línea Base y Tendencias](#10-módulo-de-análisis)
+11. [Componentes de Visualización](#11-componentes-de-visualización)
+12. [Informes Descargables (PDF / CSV)](#12-informes-descargables)
+13. [Autenticación y Seguridad](#13-autenticación-y-seguridad)
+14. [Estructura de la Aplicación Dash](#14-estructura-de-la-aplicación-dash)
+15. [Despliegue en Raspberry Pi y Acceso Remoto](#15-despliegue-en-raspberry-pi)
+16. [Desafíos Técnicos y Decisiones de Ingeniería](#16-desafíos-técnicos)
+17. [Resultados y Estado Actual](#17-resultados-y-estado-actual)
+18. [Trabajo Futuro](#18-trabajo-futuro)
+19. [Conclusiones](#19-conclusiones)
+20. [Referencias y Recursos](#20-referencias-y-recursos)
+- [Anexos](#anexos)
 
 ---
 
 ## 1. RESUMEN EJECUTIVO
 
-Este proyecto desarrolla una interfaz web interactiva para la visualización de datos biométricos obtenidos mediante smartwatches ID Vita, dirigida al equipo médico de la Residencia Asturiana de Buenos Aires. La solución implementada permite el monitoreo temporal de variables fisiológicas de adultos mayores institucionalizados, facilitando la detección temprana de cambios en el estado de salud y mejorando la toma de decisiones clínicas.
+VITAICARE es una interfaz web interactiva para la visualización y el análisis de datos biométricos obtenidos mediante smartwatches ID Vita, dirigida al equipo médico de la Residencia Asturiana de Buenos Aires. El sistema permite el monitoreo temporal de variables fisiológicas de adultos mayores institucionalizados, facilitando la detección temprana de cambios en el estado de salud y mejorando la toma de decisiones clínicas.
 
-### Logros Principales
+Respecto de la versión inicial (un visualizador de series temporales con filtros), el sistema evolucionó hasta convertirse en una **aplicación de monitoreo completa y desplegada en producción** sobre una Raspberry Pi, con los siguientes subsistemas nuevos:
 
-- **Interfaz web funcional** con visualización interactiva de 6 métricas fisiológicas
-- **Sistema de filtrado avanzado** por paciente, rango de fechas, horarios y métricas
-- **Procesamiento de 271,632 registros** de datos biométricos de 25 pacientes
-- **Detección automática de gaps** en series temporales para evitar interpretaciones erróneas
-- **Manejo correcto de zonas horarias** (UTC → Argentina GMT-3)
-- **Arquitectura modular** preparada para escalabilidad
+- **Pipeline de datos en tres etapas** (`RA.sql` → `RA.json` → Parquet) que reduce el dataset de ~520 MB a ~10 MB y permite cargar 2,36 millones de registros con ~280 MB de RAM, requisito indispensable para correr en una Raspberry Pi de 2 GB.
+- **Sistema de alarmas** con detección por umbral, enfriamiento (*cooldown*) de 1 hora y agrupación de eventos consecutivos.
+- **Módulo de análisis** con línea base personalizada (banda circadiana p10–p90 por paciente) y tendencias semanales con detección de deterioro sostenido (alerta temprana).
+- **Generación de informes descargables** en PDF (con `fpdf2` + `matplotlib`) y CSV.
+- **Autenticación por usuario y contraseña** con sesiones de Flask y gestión de usuarios por CLI.
+- **Despliegue en producción**: `gunicorn` + `systemd` en una Raspberry Pi 4, con acceso remoto vía Tailscale (VPN) y exposición pública HTTPS mediante Tailscale Funnel con dominio propio.
+
+### Logros Principales (estado actual)
+
+- **Interfaz web funcional** con dashboard de cohorte y monitor por paciente.
+- **Procesamiento de 2.363.501 registros** biométricos de 22 pacientes monitorizados (26 registros de paciente en total en la tabla `patients`).
+- **6 métricas fisiológicas** parametrizadas, con umbrales ajustables por el equipo médico.
+- **Detección y agrupación de alarmas**, con historial navegable y enlace directo al gráfico del evento.
+- **Análisis de patrones personales y tendencias** para alerta temprana de deterioro.
+- **Informes clínicos exportables** (PDF/CSV) por paciente y de cohorte.
+- **Manejo correcto de zonas horarias** (UTC → America/Argentina/Buenos_Aires).
+- **Sistema desplegado y accesible de forma segura** desde fuera de la institución.
+
+> **Nota metodológica importante:** todos los umbrales clínicos (rangos normales, límites de plausibilidad, pendientes de tendencia) son **valores por defecto razonables, NO validados clínicamente**. Están centralizados y parametrizados para que la tutora y el equipo médico los ajusten. Este informe lo recalca en cada sección correspondiente.
 
 ---
 
@@ -58,9 +79,10 @@ Los adultos mayores institucionalizados requieren monitoreo clínico cercano par
 
 Desarrollo de una interfaz de usuario clara, usable y clínicamente relevante que permita:
 
-1. Visualizar la evolución temporal de variables fisiológicas de cada residente
-2. Identificar desviaciones de patrones habituales
-3. Relacionar cambios en variables con eventos clínicos relevantes
+1. Visualizar la evolución temporal de variables fisiológicas de cada residente.
+2. Identificar desviaciones de patrones habituales (no solo de umbrales genéricos, sino del patrón propio del paciente).
+3. Relacionar cambios en variables con eventos clínicos relevantes.
+4. Detectar alarmas y tendencias de deterioro de forma automática.
 
 ### 2.3 Colaboradores
 
@@ -78,1981 +100,787 @@ Diseñar, implementar y evaluar una interfaz de usuario para visualizar variable
 
 ### 3.2 Objetivos Específicos Cumplidos
 
-✅ **Organización de dispositivos**: Sistema de trazabilidad de 24 dispositivos mediante mapeo IMEI-Paciente
-✅ **Recolección de requerimientos**: Identificación de variables prioritarias y rangos temporales óptimos
-✅ **Arquitectura funcional**: Definición de módulos, vistas principales y conjunto de indicadores
-✅ **Prototipo funcional**: Desarrollo de interfaz que permite visualización de variables fisiológicas
-✅ **Integración de datos**: Conexión con base de datos de la Residencia Asturiana
+- **Organización de dispositivos:** sistema de trazabilidad mediante mapeo IMEI–Paciente (22 dispositivos con datos; ver `config.py::IMEI`).
+- **Recolección de requerimientos:** identificación de variables prioritarias y rangos temporales óptimos; ajuste de umbrales a pedido médico (p. ej. mínimo de temperatura).
+- **Arquitectura funcional:** definición de módulos, vistas principales (Dashboard y Monitor) y conjunto de indicadores.
+- **Prototipo funcional:** interfaz que permite visualización, alarmas, análisis e informes.
+- **Integración de datos:** conexión con el volcado de la base de datos de la Residencia Asturiana mediante un pipeline reproducible.
+- **(Objetivo de máxima — escalabilidad)** despliegue real y reproducible sobre hardware de bajo costo (Raspberry Pi), con recomendaciones documentadas para escalar a otros centros.
 
 ---
 
 ## 4. ARQUITECTURA DEL SISTEMA
 
-### 4.1 Diagrama de Arquitectura
+### 4.1 Diagrama de Capas
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                   CAPA DE PRESENTACIÓN                      │
-│                     (Dash + Bootstrap)                      │
-│  ┌──────────────────────┐      ┌──────────────────────┐    │
-│  │  Sidebar (25%)       │      │  Área Principal (75%)│    │
-│  │  - Selector paciente │      │  - Gráficos Plotly   │    │
-│  │  - Filtros fechas    │──────│  - Estadísticas      │    │
-│  │  - Rango horario     │      │  - Estados de carga  │    │
-│  │  - Métricas          │      │                      │    │
-│  │  - Modo vista        │      │                      │    │
-│  └──────────────────────┘      └──────────────────────┘    │
-└────────────────────┬────────────────────────────────────────┘
-                     │
-        ┌────────────┴────────────┐
-        │   CAPA DE LÓGICA        │
-        │   (Python Callbacks)    │
-        └────────────┬────────────┘
-                     │
-        ┌────────────┴────────────┐
-        │ CAPA DE DATOS           │
-        │ - data_loader.py        │
-        │ - Caché LRU             │
-        │ - Filtrado y gaps       │
-        └────────────┬────────────┘
-                     │
-        ┌────────────┴────────────┐
-        │ FUENTE DE DATOS         │
-        │ RA.json (109 MB)        │
-        │ 271,632 registros       │
-        └─────────────────────────┘
+┌────────────────────────────────────────────────────────────────────────┐
+│ CAPA DE PRESENTACIÓN  (Dash 3 + dash-bootstrap-components, tema DARKLY)  │
+│  ┌──────────────────────────┐   ┌────────────────────────────────────┐  │
+│  │ Dashboard (cohorte)      │   │ Monitor Paciente (individual)      │  │
+│  │ - Panel de alertas       │   │ - Sidebar: filtros + descarga      │  │
+│  │ - Tabla resumen          │   │ - Gráfico principal (Plotly)       │  │
+│  │ - Modal historial alarmas│   │ - Estadísticas                     │  │
+│  │ - Descargar resumen      │   │ - Tendencias y patrones (Collapse) │  │
+│  └──────────────────────────┘   └────────────────────────────────────┘  │
+│        Login (Flask) intercepta toda petición sin sesión válida          │
+└───────────────────────────────────┬──────────────────────────────────────┘
+                                     │  callbacks (Python, reactivos)
+┌───────────────────────────────────┴──────────────────────────────────────┐
+│ CAPA DE LÓGICA / DOMINIO                                                   │
+│  data_loader.py  → carga, filtrado, gaps, detección de alarmas            │
+│  analytics.py    → línea base personal + tendencias semanales             │
+│  reports.py      → PDF/CSV (matplotlib Agg + fpdf2)                       │
+│  auth.py         → login, sesiones, guard de rutas                        │
+│  figures.py      → construcción de figuras Plotly                         │
+│  (caché en memoria con functools.lru_cache en todas las funciones caras)  │
+└───────────────────────────────────┬──────────────────────────────────────┘
+                                     │
+┌───────────────────────────────────┴──────────────────────────────────────┐
+│ CAPA DE DATOS                                                              │
+│  RA_patients.parquet  (~7,6 KB)     ← preferido en producción             │
+│  RA_wearable.parquet  (~10 MB, snappy)                                     │
+│  RA.json (~520 MB)                   ← respaldo solo en desarrollo         │
+└────────────────────────────────────────────────────────────────────────────┘
 ```
 
-### 4.2 Flujo de Datos
+### 4.2 Flujo de Datos de Extremo a Extremo
 
 ```
-Smartwatch ID Vita → MySQL Database → SQL Dump → parse_mysql_dump.py
-→ RA.json → data_loader.py (caché) → callbacks.py → figures.py → UI
+  Smartwatch ID Vita
+        │  (mediciones cada ~5 min)
+        ▼
+  MySQL/MariaDB (Residencia Asturiana)
+        │  mysqldump
+        ▼
+  RA.sql (~495–519 MB)
+        │  parse_mysql_dump.py  (parser streaming línea por línea)
+        ▼
+  RA.json (~520 MB)
+        │  convert_to_parquet.py + data_loader.build_dataframes()
+        │   - conserva solo columnas usadas de wearable
+        │   - UTC → America/Argentina/Buenos_Aires
+        │   - value → numérico
+        ▼
+  RA_patients.parquet  +  RA_wearable.parquet  (snappy)
+        │  deploy/deploy.ps1  (tar + scp / rsync)  →  Raspberry Pi
+        ▼
+  data_loader.load_all_data()  (@lru_cache, read_parquet)
+        │
+        ├─► get_patients_summary / alarmas  ──► Dashboard
+        ├─► get_filtered_data               ──► figures.py ──► Monitor
+        ├─► analytics.get_analysis_overview ──► línea base + tendencias
+        └─► reports.py                      ──► PDF / CSV descargables
 ```
+
+El pre-procesamiento pesado (parseo y conversión a Parquet) se ejecuta **en la PC de desarrollo**, donde sobra RAM. La Raspberry Pi sólo lee los Parquet ya procesados.
 
 ---
 
-## 5. TECNOLOGÍAS IMPLEMENTADAS
+## 5. PIPELINE DE DATOS
 
-### 5.1 Stack Tecnológico Principal
+Esta es la pieza central de ingeniería que habilita el despliegue en hardware de bajo costo. El pipeline transforma un volcado SQL de medio gigabyte en dos archivos columnar livianos.
 
-| Tecnología | Versión | Propósito | Justificación |
-|------------|---------|-----------|---------------|
-| **Python** | 3.14 | Lenguaje principal | Amplio ecosistema para análisis de datos y visualización |
-| **Dash** | 2.14+ | Framework web | Especializado en dashboards interactivos, ideal para visualización científica |
-| **Plotly** | 5.18+ | Gráficos interactivos | Visualizaciones dinámicas con zoom, pan, hover y descarga |
-| **Pandas** | Latest | Manipulación de datos | Estándar para análisis de series temporales |
-| **dash-bootstrap-components** | Latest | Componentes UI | Tema DARKLY profesional para reducir fatiga visual |
+### 5.1 Etapa 1 — `RA.sql` → `RA.json` (`parse_mysql_dump.py`)
 
-### 5.2 Tecnologías de Soporte
+El volcado MySQL (`mysqldump`) pesa cientos de megabytes y no puede cargarse íntegro en memoria con seguridad. `parse_mysql_dump.py` implementa un **parser streaming que recorre el archivo línea por línea**, sin cargarlo completo:
 
-- **JSON**: Formato de almacenamiento de datos (109 MB)
-- **MySQL/MariaDB**: Base de datos origen (configurado para uso futuro)
-- **Git**: Control de versiones
-- **VSCode**: Entorno de desarrollo
-- **Claude Code**: Asistencia en desarrollo
+- `parse_mysql_dump(filepath)` itera el archivo y reconoce dos tipos de sentencia:
+  - `CREATE TABLE` → `parse_create_table()` extrae el nombre de la tabla y la lista de columnas (vía expresiones regulares sobre las definiciones de columna ``` `col` tipo ```).
+  - `INSERT INTO` → `extract_insert_data()` es un *generador* que produce un `dict` por fila.
+- `extract_insert_data()` y `parse_values()` implementan un **analizador de estados a mano** (no un `split` ingenuo) que respeta:
+  - comillas simples dentro de cadenas (`in_string`),
+  - escapes con `\` (`escape_next`),
+  - comillas escapadas `''`,
+  - paréntesis anidados y separadores `),(` que pertenecen a strings.
+  Esto evita romper filas que contienen comas o paréntesis dentro de valores de texto.
+- `parse_value()` convierte cada token a tipo Python: `NULL` → `None`, cadenas entre comillas → `str` (des-escapado), y números → `int`/`float`.
+- Se cuentan y reportan las filas descartadas por desajuste de columnas (`rows_skipped`), útil para auditar la integridad del volcado.
+- `convert_dump_to_json()` serializa el `dict` resultante a `RA.json` con `json.dump(..., default=str)` (los `datetime` se guardan como texto).
 
-### 5.3 Justificación de Elecciones Tecnológicas
+**Uso:** `python parse_mysql_dump.py RA.sql` (o sin argumento, toma `RA.sql` por defecto).
 
-#### ¿Por qué Dash sobre alternativas?
+### 5.2 Etapa 2 — `RA.json` → Parquet (`convert_to_parquet.py` + `data_loader.build_dataframes`)
 
-**Ventajas de Dash:**
-- Diseñado específicamente para aplicaciones analíticas
-- Integración nativa con Plotly (gráficos científicos)
-- Arquitectura reactiva mediante callbacks
-- No requiere conocimientos de JavaScript
-- Ideal para prototipos rápidos en contexto académico
+`build_dataframes(data)` (en `data_loader.py`) es la **única fuente de pre-procesamiento**, compartida entre el camino JSON en vivo y el script de conversión, garantizando que ambos produzcan exactamente lo mismo:
 
-**Alternativas evaluadas:**
-- **Streamlit**: Más simple pero menos control sobre layout
-- **Flask + Chart.js**: Requiere más código frontend
-- **R Shiny**: Requeriría cambio de lenguaje
+1. Construye `patients_df` y `wearable_df` desde el `dict` crudo.
+2. **Reduce columnas** de `wearabledata` a las realmente usadas: `["imei", "metric", "record_datetime", "value"]` (`WEARABLE_COLUMNS`). Descartar el resto es clave para el consumo de memoria.
+3. **Convierte la zona horaria**: `record_datetime` se interpreta como UTC (`tz_localize("UTC")`) y se convierte a `America/Argentina/Buenos_Aires` (`tz_convert`).
+4. **Normaliza `value`** a numérico con `pd.to_numeric(errors="coerce")` (los no convertibles quedan `NaN`).
 
-#### ¿Por qué Python?
+`convert_to_parquet.py` carga `RA.json`, llama a `build_dataframes()` y escribe:
 
-- Lenguaje dominante en ciencia de datos biomédicos
-- Amplia comunidad en bioingeniería
-- Bibliotecas maduras para análisis temporal
-- Facilita colaboración académica
-- Preparado para integrar ML (trabajo futuro)
+- `RA_patients.parquet` con `compression="snappy"`,
+- `RA_wearable.parquet` con `compression="snappy"`.
 
----
+**Uso:** `python convert_to_parquet.py` (rutas configurables por `VITAICARE_JSON`, `VITAICARE_PATIENTS_PARQUET`, `VITAICARE_WEARABLE_PARQUET`).
 
-## 6. ESTRUCTURA DEL CÓDIGO
+### 5.3 Etapa 3 — Carga en la aplicación (`data_loader.load_all_data`)
 
-### 6.1 Organización de Archivos
-
-```
-newpacientes/
-│
-├── app.py                              # Punto de entrada principal
-│
-├── src/                                # Código fuente
-│   ├── config.py                       # Configuración centralizada
-│   ├── data_loader.py                  # Carga y filtrado de datos
-│   ├── io.py                           # Utilidades I/O (legacy)
-│   │
-│   └── dash_app/                       # Módulo Dash
-│       ├── layout.py                   # Definición de UI
-│       ├── callbacks.py                # Lógica interactiva
-│       └── figures.py                  # Generación de gráficos
-│
-├── assets/
-│   └── custom.css                      # Estilos personalizados
-│
-├── RA.json                             # Datos principales (109 MB)
-├── CLAUDE.md                           # Contexto del proyecto
-├── DISENO_GUI.md                       # Especificaciones UI/UX
-│
-└── [Documentación, scripts auxiliares]
-```
-
-### 6.2 Módulos Principales
-
-#### 6.2.1 `app.py` - Aplicación Principal
-
-**Responsabilidad**: Inicialización y configuración del servidor
-
-```python
-from dash import Dash
-import dash_bootstrap_components as dbc
-from src.dash_app.layout import create_layout
-from src.dash_app.callbacks import register_callbacks
-from src.data_loader import load_all_data
-
-# Pre-carga de datos
-load_all_data()
-
-# Inicialización Dash con tema Bootstrap
-app = Dash(__name__,
-           external_stylesheets=[dbc.themes.DARKLY],
-           suppress_callback_exceptions=True)
-
-app.layout = create_layout()
-register_callbacks(app)
-
-if __name__ == "__main__":
-    app.run(debug=True, port=8050)
-```
-
-**Características**:
-- Pre-carga de datos en memoria (optimización de performance)
-- Tema oscuro (reduce fatiga visual del personal médico)
-- Puerto 8050 para desarrollo local
-
-#### 6.2.2 `config.py` - Configuración Centralizada
-
-**Contenido**:
-
-**A. Configuración de Base de Datos**
-```python
-DB_CONFIG = {
-    'host': 'localhost',
-    'port': 3306,
-    'user': 'root',
-    'password': '',
-    'database': 'test1'
-}
-```
-
-**B. Configuración Temporal**
-```python
-TIMEZONE = 'America/Argentina/Buenos_Aires'  # UTC-3
-SAMPLE_PERIOD_MINUTES = 5                    # Período de muestreo
-GAP_THRESHOLD_MINUTES = 5                    # Detección de gaps
-```
-
-**C. Mapeo IMEI-Paciente** (24 dispositivos)
-```python
-IMEI_TO_PATIENT = {
-    "863269073647387": "001",
-    "863269073648211": "002",
-    ...
-}
-```
-
-**D. Configuración de Métricas** (6 variables fisiológicas)
-
-| Métrica | Color | Unidad | Rango Normal | Nombre Display |
-|---------|-------|--------|--------------|----------------|
-| heart_rate | #FF6B6B | BPM | 60-100 | Frecuencia Cardíaca |
-| blood_oxygen_saturation | #4ECDC4 | % | 95-100 | Saturación de Oxígeno |
-| systolic_blood_pressure | #95E1D3 | mmHg | 90-140 | Presión Arterial Sistólica |
-| diastolic_blood_pressure | #F38181 | mmHg | 60-90 | Presión Arterial Diastólica |
-| temperature | #AA96DA | °C | 36.0-37.5 | Temperatura Corporal |
-| daily_activity_steps | #FCBAD3 | pasos | - | Actividad Diaria (Pasos) |
-
-**Justificación de rangos normales**: Basados en guías clínicas para población geriátrica (AHA, OMS).
-
-#### 6.2.3 `data_loader.py` - Gestión de Datos
-
-**Funciones Principales**:
-
-**A. `load_all_data()` con Caché LRU**
 ```python
 @lru_cache(maxsize=1)
 def load_all_data():
-    """Carga RA.json una sola vez y cachea en memoria."""
-    # Conversión timezone: UTC → Argentina
-    wearable_df["record_datetime"] = (
-        pd.to_datetime(wearable_df["record_datetime"])
-        .dt.tz_localize("UTC")
-        .dt.tz_convert("America/Argentina/Buenos_Aires")
-    )
-    return patients_df, wearable_df
+    if os.path.exists(PARQUET_PATIENTS) and os.path.exists(PARQUET_WEARABLE):
+        return pd.read_parquet(PARQUET_PATIENTS), pd.read_parquet(PARQUET_WEARABLE)
+    with open(JSON_PATH, "r") as f:
+        data = json.load(f)
+    return build_dataframes(data)
 ```
 
-**Optimización**: LRU cache evita recargas innecesarias (109 MB).
+- **Prefiere los Parquet** (rápidos y livianos); sólo cae al JSON si no existen (escenario de desarrollo).
+- `@lru_cache(maxsize=1)` garantiza una sola carga por proceso: la primera consulta paga el costo, las siguientes son instantáneas.
+- Rutas configurables por variables de entorno (`VITAICARE_*`).
 
-**B. `get_filtered_data()` - Filtrado Inteligente**
+### 5.4 Por qué Parquet — la decisión de ingeniería clave
 
-**Características clave**:
+| Métrica | JSON (`RA.json`) | Parquet (`RA_wearable.parquet`) |
+|---|---|---|
+| Tamaño en disco | ~520 MB | ~10 MB |
+| RAM para tener el DataFrame en memoria | varios GB con `json.load` (provoca **OOM** en 2 GB) | ~280 MB |
+| Tiempo de carga en la Pi | inviable | segundos |
+| Columnas almacenadas | todas | sólo 4 usadas |
 
-1. **Filtrado por fecha y hora combinados**:
-```python
-if time_start is not None and time_end is not None:
-    start_datetime = pd.to_datetime(date_start).tz_localize(TZ) + pd.Timedelta(hours=time_start)
-    end_datetime = pd.to_datetime(date_end).tz_localize(TZ) + pd.Timedelta(hours=time_end)
-```
-
-2. **Detección automática de gaps** (>15 minutos):
-```python
-time_diff = df["record_datetime"].diff()
-gaps = time_diff > pd.Timedelta(minutes=15)
-
-# Insertar NaN para romper líneas gráficas
-gap_rows = [{"record_datetime": ..., "value": np.nan}]
-```
-
-**Justificación**: Evita conectar puntos distantes en el tiempo, previniendo interpretaciones erróneas de continuidad de datos.
-
-#### 6.2.4 `layout.py` - Interfaz de Usuario
-
-**Estructura de Layout**:
-
-```
-┌─────────────────────────────────────────────────────┐
-│  Header: "VITAICARE - Monitor de Pacientes"        │
-├───────────────┬─────────────────────────────────────┤
-│  SIDEBAR 25% │  MAIN CONTENT 75%                   │
-│               │                                     │
-│  ┌─────────┐ │  ┌──────────────────────────────┐  │
-│  │Patient  │ │  │                              │  │
-│  │Dropdown │ │  │   Gráfico Plotly             │  │
-│  └─────────┘ │  │   Interactivo                │  │
-│               │  │   (Overlay/Subplots)         │  │
-│  ┌─────────┐ │  │                              │  │
-│  │Patient  │ │  └──────────────────────────────┘  │
-│  │Info Card│ │                                     │
-│  │ -ID     │ │  ┌──────────────────────────────┐  │
-│  │ -Género │ │  │  Estadísticas                │  │
-│  │ -Edad   │ │  │  ┌────┐ ┌────┐ ┌────┐       │  │
-│  │ -Hosp.  │ │  │  │Min │ │Max │ │Avg │       │  │
-│  └─────────┘ │  │  └────┘ └────┘ └────┘       │  │
-│               │  └──────────────────────────────┘  │
-│  ┌─────────┐ │                                     │
-│  │Fecha    │ │                                     │
-│  │Inicio   │ │                                     │
-│  └─────────┘ │                                     │
-│               │                                     │
-│  ┌─────────┐ │                                     │
-│  │Fecha    │ │                                     │
-│  │Fin      │ │                                     │
-│  └─────────┘ │                                     │
-│               │                                     │
-│  ┌─────────┐ │                                     │
-│  │Hora     │ │                                     │
-│  │Inicio   │ │                                     │
-│  └─────────┘ │                                     │
-│               │                                     │
-│  ┌─────────┐ │                                     │
-│  │Hora     │ │                                     │
-│  │Fin      │ │                                     │
-│  └─────────┘ │                                     │
-│               │                                     │
-│  ┌─────────┐ │                                     │
-│  │Métricas │ │                                     │
-│  │☑ FC     │ │                                     │
-│  │☑ SpO2   │ │                                     │
-│  │☑ PAS    │ │                                     │
-│  │☐ PAD    │ │                                     │
-│  │☐ Temp   │ │                                     │
-│  │☐ Pasos  │ │                                     │
-│  └─────────┘ │                                     │
-│               │                                     │
-│  ┌─────────┐ │                                     │
-│  │Modo     │ │                                     │
-│  │○ Overlay│ │                                     │
-│  │○ Subplot│ │                                     │
-│  └─────────┘ │                                     │
-└───────────────┴─────────────────────────────────────┘
-```
-
-**Componentes UI**:
-
-1. **dbc.Select**: Dropdown de pacientes
-2. **dbc.Card**: Tarjeta de información demográfica
-3. **dcc.DatePickerSingle**: Selectores de fecha con calendario
-4. **dbc.Select**: Dropdowns de hora (00:00-23:00)
-5. **dbc.Checklist**: Selección múltiple de métricas
-6. **dbc.RadioItems**: Modo de visualización
-7. **dcc.Loading**: Spinner durante carga de datos
-8. **dcc.Graph**: Contenedor de gráficos Plotly
-
-**Diseño UX**:
-- Tema oscuro para reducir fatiga visual
-- Controles agrupados lógicamente
-- Información de paciente siempre visible
-- Estados de carga explícitos
-
-#### 6.2.5 `callbacks.py` - Lógica Interactiva
-
-**Callback 1: Actualización de Información del Paciente**
-
-```python
-@app.callback(
-    [Output("patient-info", "children"),
-     Output("date-start-picker", "min_date_allowed"),
-     Output("date-start-picker", "max_date_allowed"),
-     Output("date-start-picker", "date"),
-     Output("date-end-picker", "date")],
-    Input("patient-dropdown", "value")
-)
-def update_patient_info(patient_id):
-    # Obtiene info demográfica
-    # Calcula edad a partir de fecha de nacimiento
-    # Determina rango de fechas disponibles
-    # Establece rango por defecto (últimos 7 días)
-```
-
-**Lógica de edad**:
-```python
-age = calculate_age(date_of_birth)  # Considera años completos
-```
-
-**Lógica de rango por defecto**:
-- Si hay >7 días de datos → últimos 7 días
-- Si hay <7 días → todo el rango disponible
-
-**Callback 2: Actualización de Gráfico y Estadísticas**
-
-```python
-@app.callback(
-    [Output("main-graph", "figure"),
-     Output("stats-panel", "children")],
-    [Input("patient-dropdown", "value"),
-     Input("date-start-picker", "date"),
-     Input("date-end-picker", "date"),
-     Input("hour-start-dropdown", "value"),
-     Input("hour-end-dropdown", "value"),
-     Input("metrics-checklist", "value"),
-     Input("view-mode", "value")]
-)
-def update_graph(...):
-    # Validación de inputs
-    # Carga de datos filtrados
-    # Verificación de datasets vacíos
-    # Selección de tipo de visualización
-    # Cálculo de estadísticas
-```
-
-**Validaciones implementadas**:
-1. Paciente seleccionado
-2. Fechas válidas (inicio ≤ fin)
-3. Al menos 1 métrica seleccionada
-4. Datos disponibles para el rango
-
-#### 6.2.6 `figures.py` - Generación de Gráficos
-
-**Función 1: Gráfico Superpuesto**
-
-```python
-def create_overlaid_figure(data_dict):
-    """Múltiples métricas en un solo eje Y."""
-    fig = go.Figure()
-
-    for metric, df in data_dict.items():
-        fig.add_trace(go.Scatter(
-            x=df["record_datetime"],
-            y=df["value"],
-            mode="lines+markers",
-            name=METRICS[metric]["name"],
-            line=dict(color=METRICS[metric]["color"]),
-            marker=dict(size=4)
-        ))
-
-    fig.update_layout(
-        template="plotly_dark",
-        hovermode="x unified",
-        showlegend=True,
-        height=600
-    )
-```
-
-**Ventajas**:
-- Comparación visual directa entre métricas
-- Patrones temporales cruzados evidentes
-- Uso eficiente del espacio
-
-**Función 2: Gráfico con Subplots**
-
-```python
-def create_subplot_figure(data_dict):
-    """Cada métrica en su propio eje Y."""
-    n_metrics = len(data_dict)
-    fig = make_subplots(
-        rows=n_metrics,
-        cols=1,
-        shared_xaxes=True,
-        vertical_spacing=0.05,
-        subplot_titles=[METRICS[m]["name"] for m in data_dict]
-    )
-
-    for i, (metric, df) in enumerate(data_dict.items(), 1):
-        fig.add_trace(
-            go.Scatter(...),
-            row=i, col=1
-        )
-```
-
-**Ventajas**:
-- Escalas independientes (importante cuando rangos difieren)
-- Lectura precisa de valores
-- Identificación clara de tendencias por métrica
-
-**Función 3: Cálculo de Estadísticas**
-
-```python
-def calculate_stats(data_dict):
-    """Calcula min, max, promedio por métrica."""
-    stats = {}
-    for metric, df in data_dict.items():
-        stats[metric] = {
-            "min": df["value"].min(),
-            "max": df["value"].max(),
-            "mean": df["value"].mean(),
-            "unit": METRICS[metric]["unit"]
-        }
-    return stats
-```
-
-**Estadísticas calculadas**:
-- **Mínimo**: Valor más bajo en rango seleccionado
-- **Máximo**: Valor más alto en rango seleccionado
-- **Promedio**: Media aritmética (μ)
-- **Unidad**: Según configuración de métrica
+**Motivo concreto:** cargar el JSON con `json.load` en una Raspberry Pi de 2 GB agota la memoria (Out-Of-Memory). El formato columnar Parquet con compresión *snappy*, tras descartar columnas innecesarias, hace que el DataFrame completo de **2.363.501 filas** entre en memoria con un consumo modesto. Esta reducción de ~520 MB a ~10 MB en disco (y de varios GB a ~280 MB en RAM) es lo que hace posible el despliegue en hardware de bajo costo.
 
 ---
 
-## 7. FUENTES DE DATOS
+## 6. TECNOLOGÍAS IMPLEMENTADAS
 
-### 7.1 Hardware y Sensores
+### 6.1 Stack y Versiones (de `requirements.txt`, fijadas y validadas)
 
-**Dispositivo**: ID Vita - Telecare Smartwatch (Intelligent Data)
+| Tecnología | Versión | Propósito |
+|------------|---------|-----------|
+| **Python** | 3.11+ (Pi) / 3.x (desarrollo) | Lenguaje principal |
+| **dash** | 3.3.0 | Framework web reactivo |
+| **dash-bootstrap-components** | 2.0.4 | Componentes UI (tema DARKLY) |
+| **pandas** | 2.3.3 | Manipulación de series temporales |
+| **plotly** | 6.5.2 | Gráficos interactivos |
+| **pyarrow** | 18.1.0 | Lectura/escritura de Parquet |
+| **gunicorn** | 23.0.0 | Servidor WSGI de producción (systemd) |
+| **fpdf2** | 2.8.7 | Generación de PDF (pura-Python) |
+| **matplotlib** | 3.10.8 | Gráficos de los informes (backend "Agg") |
+| **Flask / Werkzeug** | (deps. de Dash) | Servidor base + hashing de contraseñas |
+| **numpy** | (dep. de pandas) | Cálculos del módulo de análisis |
 
-**Sensores**:
-- Fotopletismografía (PPG) para frecuencia cardíaca
-- Oxímetro de pulso para SpO2
-- Termómetro digital para temperatura corporal
-- Sensor de presión para presión arterial
-- Acelerómetro para conteo de pasos
+Todas las dependencias tienen *wheels* precompiladas para Raspberry Pi OS de 64 bits (`aarch64`), evitando compilaciones en la Pi. `streamlit`, `weasyprint` y `markdown` se excluyeron a propósito: sólo los usan scripts auxiliares y no hacen falta para correr el dashboard, manteniendo liviana la instalación en la Pi.
 
-**Frecuencia de muestreo**: ~5 minutos (configurable)
+### 6.2 Justificación de Elecciones
 
-### 7.2 Base de Datos
+- **Dash + Plotly:** diseñado para aplicaciones analíticas; integración nativa de gráficos científicos interactivos sin escribir JavaScript; arquitectura reactiva por *callbacks*.
+- **Parquet (pyarrow):** formato columnar comprimido, lectura rápida y bajo consumo de RAM (ver §5.4).
+- **gunicorn (1 worker):** servidor WSGI estable de producción; un solo worker por la restricción de memoria (ver §15).
+- **fpdf2 + matplotlib Agg:** generación de PDF e imágenes sin dependencias de sistema pesadas ni *display* (headless), apropiado para la Pi.
 
-**Origen**: MySQL/MariaDB en Residencia Asturiana
+---
 
-**Pipeline de datos**:
-```
-MySQL → RA.sql (dump) → parse_mysql_dump.py → RA.json → Aplicación
-```
+## 7. CONFIGURACIÓN CENTRALIZADA
 
-### 7.3 Estructura de Datos
+Todo lo parametrizable vive en `src/config.py`, de modo que el equipo médico pueda ajustar umbrales sin tocar la lógica.
 
-**RA.json** - 109 MB, 4 tablas principales:
+### 7.1 Métricas (`METRICS`)
 
-#### Tabla 1: `patients` (25 registros)
+| Clave | Nombre | Color | Unidad | normal_min | normal_max |
+|-------|--------|-------|--------|-----------|-----------|
+| `heart_rate` | Frecuencia Cardíaca | `#E06464` | bpm | 50 | 120 |
+| `blood_oxygen_saturation` | Saturación O2 | `#A268BA` | % | 80 | 100 |
+| `systolic_blood_pressure` | Presión Sistólica | `#68c2f6` | mmHg | 90 | 140 |
+| `diastolic_blood_pressure` | Presión Diastólica | `#8eb69b` | mmHg | 60 | 90 |
+| `temperature` | Temperatura | `#FFEAA7` | °C | 25.0 | 38.0 |
+| `daily_activity_steps` | Pasos Diarios | `#DDA0DD` | pasos | 0 | (sin máx.) |
 
-```json
-{
-  "patient_id": "005",
-  "imei": "863269073648179",
-  "valid_from": "2026-01-17 13:26:21",
-  "hospital_id": "RA_005",
-  "genre": "M",
-  "postal_code": null,
-  "date_of_birth": "1945-03-15",
-  "latest_hemodialysis_date": null,
-  "diabetes_mellitus": false,
-  "charlson_index": null,
-  "barthel_index": null
-}
-```
+> El mínimo de temperatura se ajustó de 33 °C a **25 °C a pedido del equipo médico**, para no marcar como alarma lecturas bajas habituales del sensor periférico. Los pasos no tienen máximo definido.
 
-**Campos clave**:
-- `patient_id`: Identificador interno (001-025)
-- `imei`: IMEI del smartwatch asignado
-- `date_of_birth`: Para cálculo de edad
-- `genre`: M/F para estadísticas demográficas
+### 7.2 Estructuras de Dominio
 
-#### Tabla 2: `wearabledata` (271,632 registros)
+- **`Alarm` (dataclass):** representa una alarma con `patient_id, metric_key, value, timestamp, alert_type` y metadatos (`metric_name, unit, color`). Métodos: `formatted_date`, `to_context()`/`from_context()` (serialización a/desde `dcc.Store`, cruzando la frontera JSON), y `from_row()` (construcción desde una fila del DataFrame).
+- **`AlertType` (Enum):** `LOW` / `HIGH` / `BOTH`, con `display_name` en español ("Bajo" / "Alto" / "Ambos").
 
-```json
-{
-  "patient_id": "519",
-  "imei": "863269073647197",
-  "metric": "heart_rate",
-  "value": 89.0,
-  "record_datetime": "2026-01-10 12:43:06"
-}
-```
+### 7.3 Configuración Temporal (`TimeConfig` / `CFG`)
 
-**Métricas disponibles**:
-1. `heart_rate` (45,272 registros)
-2. `blood_oxygen_saturation` (45,272 registros)
-3. `systolic_blood_pressure` (45,272 registros)
-4. `diastolic_blood_pressure` (45,272 registros)
-5. `temperature` (45,272 registros)
-6. `daily_activity_steps` (1,602 registros)
+- `sample_period_minutes = 5`
+- `gap_threshold_minutes = 5`
+- `tz = "America/Argentina/Buenos_Aires"`
+- **`alarm_cooldown_minutes = 60`** — enfriamiento de alarmas (ver §9).
 
-**Rango temporal**: Diciembre 3, 2024 - Enero 26, 2026 (~54 días)
+### 7.4 Configuración de Análisis (`AnalyticsConfig` / `ACFG`)
 
-#### Tabla 3: `perceivedhealthdata` (44 registros)
+- `ANALYSIS_METRICS = ("heart_rate", "blood_oxygen_saturation", "temperature")` — a propósito **sin pasos ni presión**.
+- `PLAUSIBILITY`: límites de descarte de artefactos — FC `(30, 200)`, SpO2 `(70, 100)`, temperatura `(28, 43)`.
+- `ADVERSE_DIRECTION`: dirección clínicamente adversa — FC `+1` (subir es malo), SpO2 `-1` (bajar es malo), temperatura `+1`.
+- `SLOPE_THRESHOLDS`: pendiente mínima por semana para marcar tendencia adversa — FC `1.5` bpm/sem, SpO2 `0.5` %/sem, temperatura `0.1` °C/sem.
+- Parámetros de banda/tendencia: percentiles `p10`/`p90`, `circadian_bucket_hours = 2`, `baseline_min_readings = 200`, `baseline_bucket_min = 20`, ventana nocturna `00:00–06:00`, `trend_weeks = 4`, `trend_min_weeks = 3`.
 
-Estado de salud autopercibido por pacientes (no implementado en v1.0).
+> **Todos** estos umbrales son *defaults* razonables, **NO validados clínicamente**, parametrizados para ajuste por el equipo médico (comentado explícitamente en el código fuente).
 
-#### Tabla 4: `labresults` (20 registros)
+---
 
-Resultados de laboratorio clínico (preparado para integración futura).
+## 8. FUENTES Y REALIDAD DE LOS DATOS
 
-### 7.4 Gestión de Zona Horaria
+### 8.1 Hardware y Sensores
 
-**Problema identificado**: Los datos originales en MySQL están en UTC, pero necesitan mostrarse en hora Argentina para el equipo médico local.
+**Dispositivo:** ID Vita – Telecare Smartwatch (Intelligent Data). Sensores: PPG (frecuencia cardíaca), oximetría de pulso (SpO2), temperatura, presión arterial y acelerómetro (pasos). Frecuencia de muestreo: ~5 minutos.
 
-**Solución implementada**:
+### 8.2 Estructura del Volcado (`RA.sql` / `RA.json`)
+
+Tablas presentes en el volcado de la Residencia Asturiana:
+
+| Tabla | Filas | Observación |
+|-------|------:|-------------|
+| `patients` | 26 (11 columnas) | 22 con datos de wearable asociados |
+| `wearabledata` | 2.363.501 | serie temporal de signos vitales |
+| `perceivedhealthdata` | 122 | estado autopercibido (no usado en la app actual) |
+| `clinicalevents` | 0 | vacía en el volcado |
+| `labresults` | 0 | vacía en el volcado |
+| `sessionresults` | 0 | vacía en el volcado |
+
+**Distribución de `wearabledata` por métrica** (verificada sobre el Parquet):
+
+| Métrica | Registros |
+|---------|----------:|
+| temperature | 468.589 |
+| diastolic_blood_pressure | 468.589 |
+| systolic_blood_pressure | 468.588 |
+| heart_rate | 468.587 |
+| blood_oxygen_saturation | 468.587 |
+| daily_activity_steps | 20.561 |
+
+Esquema mínimo conservado en `RA_wearable.parquet`: `imei, metric, record_datetime, value`. El rango temporal de registros abarca desde 2023 hasta junio de 2026 en el volcado actual, con aproximadamente **6 meses de datos densos por paciente** y muestreo de ~5 minutos.
+
+### 8.3 Limitaciones de los datos que condicionan el análisis
+
+Estas observaciones son relevantes para la interpretación clínica y la redacción de la tesis:
+
+- **Comorbilidades vacías:** `charlson_index`, `barthel_index` y `latest_hemodialysis_date` están vacíos; `diabetes_mellitus` es 0 para todos. No es posible estratificar por comorbilidad.
+- **Edad poco confiable:** las fechas de nacimiento son *placeholders*, por lo que la edad calculada no es fiable.
+- **Presión arterial sospechosa:** los valores están acotados exactamente a los umbrales configurados, lo que sugiere **datos sintéticos**. Por eso la presión se excluye del módulo de análisis.
+- **Pasos excluidos del análisis:** el fabricante no garantiza la exactitud del conteo de pasos, por lo que se excluyen del análisis (aunque sí se pueden visualizar).
+- **Cobertura:** 22 pacientes tienen datos de wearable; la tabla `patients` tiene 26 filas.
+
+### 8.4 Gestión de Zona Horaria
+
+Los datos originales están en UTC y deben mostrarse en hora de Argentina (UTC-3) para el equipo médico local. La conversión se centraliza en `build_dataframes()`:
 
 ```python
-# En data_loader.py
 wearable_df["record_datetime"] = (
     pd.to_datetime(wearable_df["record_datetime"])
-    .dt.tz_localize("UTC")                              # Marca como UTC
-    .dt.tz_convert("America/Argentina/Buenos_Aires")    # Convierte a GMT-3
+    .dt.tz_localize("UTC")
+    .dt.tz_convert("America/Argentina/Buenos_Aires")
 )
 ```
 
-**Impacto**:
-- Todos los timestamps se muestran correctamente en hora local
-- Filtros de fecha/hora funcionan en zona horaria del usuario
-- Crítico para correlación con eventos clínicos registrados localmente
-
-**Ejemplo**:
-```
-UTC: 2026-01-19 20:10:00
-Argentina: 2026-01-19 17:10:00  (UTC-3)
-```
+Todos los filtros y bordes de rango se construyen también *tz-aware* en la misma zona, de modo que las consultas de fecha/hora del usuario y la correlación con eventos clínicos locales sean correctas.
 
 ---
 
-## 8. COMPONENTES DE VISUALIZACIÓN
+## 9. SISTEMA DE ALARMAS
 
-### 8.1 Librería Plotly
+Implementado en `src/data_loader.py`. Una alarma es un cruce de umbral: `value < normal_min` (bajo) o `value > normal_max` (alto), por métrica.
 
-**Justificación**: Plotly es el estándar de facto para visualización científica interactiva en Python.
+### 9.1 Detección con enfriamiento (`_detect_alarms` + `_with_cooldown`)
 
-**Ventajas sobre alternativas**:
-- Interactividad nativa (zoom, pan, hover, download)
-- Render en GPU para datasets grandes
-- Exportación a imagen estática
-- Compatibilidad móvil
-- Documentación extensa
+El problema: una condición sostenida (p. ej. SpO2 baja durante horas, muestreada cada 5 min) generaría decenas de alarmas redundantes. Solución en dos niveles. El primero, el **enfriamiento (cooldown)**:
 
-**Comparación con alternativas**:
+- `_with_cooldown(rows_sorted, cooldown)` recorre las lecturas fuera de rango **en orden cronológico** y conserva una alarma sólo si pasó al menos `cooldown` (1 hora, `CFG.alarm_cooldown_minutes`) desde la **última alarma conservada** (no desde las ignoradas).
+- En `_detect_alarms()`, el enfriamiento se aplica **por (métrica, tipo)** de forma independiente: las alarmas "bajo" y "alto" de una misma métrica, y las distintas métricas, se enfrían por separado. Así, una métrica que oscila por encima y por debajo no se silencia entre sí.
+- `_detect_alarms` es la **única fuente de verdad** de la detección, reutilizada por el dashboard y el historial. Acepta un `metric_filter` opcional. Devuelve las alarmas ordenadas por timestamp descendente.
 
-| Característica | Plotly | Matplotlib | Bokeh | Chart.js |
-|----------------|--------|------------|-------|----------|
-| Interactividad | ✅ Nativa | ❌ Limitada | ✅ Buena | ✅ Buena |
-| Series temporales | ✅ Excelente | ⚠️ Básica | ✅ Buena | ⚠️ Media |
-| Integración Python | ✅ Perfecta | ✅ Perfecta | ✅ Buena | ❌ Requiere JS |
-| Performance | ✅ Alta | ⚠️ Media | ✅ Alta | ✅ Alta |
-| Tema oscuro | ✅ Built-in | ⚠️ Manual | ⚠️ Manual | ⚠️ Manual |
+### 9.2 Agrupación de eventos (`group_consecutive_alarms`)
 
-### 8.2 Modos de Visualización
+Segundo nivel de agregación, sobre las alarmas ya enfriadas:
 
-#### Modo 1: Overlay (Superpuesto)
+- Colapsa alarmas **consecutivas de la misma (métrica, tipo)** separadas por no más de **1,5× el cooldown** (90 min) en un único **evento** con `start`, `end`, `count` y `extreme_value` (peor valor del evento: mínimo si es "bajo", máximo si es "alto").
+- La agrupación se hace por *bucket* `(métrica, tipo)` por separado, de modo que una alarma de otro tipo intercalada **no corta la racha**.
+- Cada evento incluye el `context` de la alarma extrema, que el botón "Ver" del historial usa para navegar al gráfico centrado en ese momento.
+- Los eventos se devuelven del más reciente al más antiguo.
 
-**Uso**: Comparación directa entre métricas
+Resultado clínico: una condición sostenida que dispararía "una alarma por hora" se presenta como **un solo renglón** "de tal hora a tal hora (N alarmas)", mucho más legible.
 
-**Ejemplo visual**:
-```
-  │ FC (rojo) + SpO2 (azul) + Temp (morado)
-  │    ╱╲    ╱╲                     •••
-  │   ╱  ╲  ╱  ╲      •••••      •••
-  │  ╱    ╲╱    ╲   ••     ••  ••
-  │ ╱            ╲ •         ••
-  └─────────────────────────────────────────
-    00:00      06:00      12:00      18:00
-```
+### 9.3 Resúmenes cacheados
 
-**Ideal para**:
-- Identificar correlaciones entre variables
-- Patrones temporales cruzados (ej: SpO2 baja cuando FC sube)
-- Visión general rápida
+- `get_patients_summary()` (`@lru_cache(1)`): para cada paciente, calcula últimos valores por métrica y estado de alerta sobre los **últimos 7 días**; conserva la alarma más reciente por métrica para las tarjetas del dashboard.
+- `get_patients_with_alerts()` (`@lru_cache(1)`): reutiliza el summary y filtra los que tienen alertas.
+- `get_patient_alarm_history(patient_id, metric_filter, days)` (`@lru_cache(256)`): historial por paciente, con filtro de métrica y ventana opcional de días (para "cargar más semanas").
 
-**Limitación**: Escalas diferentes pueden dificultar lectura exacta.
-
-#### Modo 2: Subplots (Gráficos Separados)
-
-**Uso**: Análisis detallado por métrica
-
-**Ejemplo visual**:
-```
-FC (BPM)
-  100 ├─────╱╲─────╱╲─────
-   80 ├────╱──╲───╱──╲────
-   60 └────────────────────
-      00:00    12:00   24:00
-
-SpO2 (%)
-   98 ├─────•••••─────•••
-   96 ├────•────•───••───
-   94 └────────────────────
-      00:00    12:00   24:00
-
-Temp (°C)
- 37.0 ├──────╱╲──────╱╲──
- 36.5 ├─────╱──╲────╱──╲─
- 36.0 └────────────────────
-      00:00    12:00   24:00
-```
-
-**Ideal para**:
-- Lectura precisa de valores
-- Identificar tendencias dentro de una métrica
-- Análisis cuando rangos son muy diferentes
-
-**Configuración**:
-- Eje X compartido (tiempo)
-- Ejes Y independientes (escalas propias)
-- Altura: 200px por métrica
-- Espacio vertical: 5% entre gráficos
-
-### 8.3 Características Interactivas
-
-**Implementadas en Plotly**:
-
-1. **Hover Tooltip**:
-   - Fecha/hora exacta
-   - Valor numérico
-   - Unidad de medida
-   - Nombre de métrica
-
-2. **Zoom**:
-   - Box zoom: Seleccionar rectángulo
-   - Scroll zoom: Rueda del ratón
-   - Reset: Doble clic
-
-3. **Pan**:
-   - Arrastrar para desplazar vista
-   - Útil después de hacer zoom
-
-4. **Exportación**:
-   - PNG: Imagen estática
-   - SVG: Vectorial (para reportes)
-
-5. **Leyenda Interactiva**:
-   - Clic para ocultar/mostrar métrica
-   - Doble clic para aislar métrica
-
-### 8.4 Manejo de Gaps en Datos
-
-**Problema**: Conectar puntos distantes en el tiempo crea líneas que implican datos inexistentes.
-
-**Ejemplo problemático**:
-```
-    •────────•   [línea implica datos continuos]
-  08:00    14:00  [pero hay 6 horas sin mediciones]
-```
-
-**Solución implementada**:
-
-```python
-# Detectar gaps >15 minutos
-time_diff = df["record_datetime"].diff()
-gaps = time_diff > pd.Timedelta(minutes=15)
-
-# Insertar NaN para romper línea
-for gap_idx in gaps[gaps].index:
-    gap_time = df.loc[gap_idx, "record_datetime"] - pd.Timedelta(seconds=1)
-    gap_row = {"record_datetime": gap_time, "value": np.nan}
-    gap_rows.append(gap_row)
-
-# Combinar y ordenar
-df = pd.concat([df, pd.DataFrame(gap_rows)]).sort_values("record_datetime")
-```
-
-**Resultado visual**:
-```
-    •            •   [sin línea = sin datos]
-  08:00    14:00
-```
-
-**Justificación clínica**: Evita que el personal médico asuma continuidad de signos vitales donde no hay mediciones.
+Como los datos son estáticos por despliegue (se cargan una vez del Parquet), estos cálculos pesados se hacen una sola vez; al reiniciar el servicio tras desplegar datos nuevos, la caché se limpia sola.
 
 ---
 
-## 9. FUNCIONALIDADES IMPLEMENTADAS
+## 10. MÓDULO DE ANÁLISIS
 
-### 9.1 Funcionalidades Core
+Implementado en `src/analytics.py` (subsistema nuevo). Ofrece dos análisis complementarios, ambos sobre `ANALYSIS_METRICS` (FC, SpO2, temperatura) y siempre tras limpiar artefactos.
 
-#### F1: Selección de Paciente
+### 10.1 Limpieza (`_apply_cleaning`)
 
-**Interfaz**: Dropdown con 25 pacientes
+Única fuente de limpieza: descarta `NaN` y lecturas fuera de los límites de `PLAUSIBILITY` (p. ej. temperatura < 28 °C = reloj fuera del cuerpo). Se aplica de forma vectorizada por métrica.
 
-**Funcionalidad**:
-- Muestra ID de paciente (001-025)
-- Al seleccionar, actualiza:
-  - Información demográfica
-  - Rango de fechas disponibles
-  - Rango de fechas por defecto (últimos 7 días)
+### 10.2 Línea base personalizada (`compute_personal_baseline`)
 
-**Implementación**:
-```python
-patient_options = [
-    {"label": f"Paciente {p['patient_id']}", "value": p['patient_id']}
-    for p in get_patient_list()
-]
-```
+Para cada paciente y métrica, calcula su **rango usual propio** en lugar de un umbral genérico igual para todos:
 
-#### F2: Filtrado Temporal
+- Banda global de respaldo: percentiles `p10`–`p90` de todo el histórico del paciente.
+- **Banda circadiana:** divide el día en franjas de 2 horas (`circadian_bucket_hours`) y calcula `p10`–`p90` por franja, reconociendo que (p. ej.) la FC nocturna difiere de la diurna.
+- Requisitos mínimos de datos: 200 lecturas totales (`baseline_min_readings`) y 20 por franja (`baseline_bucket_min`); si una franja no llega, usa la banda global.
+- `band_for(df, baseline)` mapea cada fila a su banda según la franja horaria.
 
-**Componentes**:
-1. **Fecha de inicio**: DatePickerSingle con calendario
-2. **Fecha de fin**: DatePickerSingle con calendario
-3. **Hora de inicio**: Dropdown 00:00-23:00 (intervalos de 1h)
-4. **Hora de fin**: Dropdown 00:00-23:00 (intervalos de 1h)
+Los puntos que caen fuera de la banda personal se resaltan como "fuera de SU patrón".
 
-**Lógica avanzada**:
-```python
-# Caso 1: Solo fechas (sin horas) → Días completos
-if time_start is None:
-    start_datetime = date_start 00:00:00
-    end_datetime = date_end 23:59:59
+### 10.3 Tendencia semanal (`compute_weekly_trend`)
 
-# Caso 2: Fechas + horas → Rango exacto
-else:
-    start_datetime = date_start + time_start
-    end_datetime = date_end + time_end
-```
+Detección de **deterioro sostenido** (alerta temprana):
 
-**Validaciones**:
-- Fecha inicio ≤ Fecha fin
-- Rango dentro de datos disponibles
-- Horas opcionales (default: día completo)
+- **FC:** se usa la **FC en reposo nocturna** = percentil bajo (p10) de las lecturas entre 00:00 y 06:00, agregada por día.
+- **SpO2 / temperatura:** mediana diaria.
+- Agregación diaria → semanal (mediana, `resample("W")`); se toman las **últimas 4 semanas** (`trend_weeks`), con mínimo de 3 semanas con datos (`trend_min_weeks`).
+- **Pendiente** por mínimos cuadrados (`np.polyfit`, grado 1).
+- **Anclaje temporal:** la ventana se ancla a la **última fecha de datos del paciente, no a `now()`**, porque los datos son históricos. Esta es una decisión deliberada: usar la fecha actual descartaría datos válidos.
+- Se marca `adverse` si el signo de la pendiente coincide con `ADVERSE_DIRECTION` y `|pendiente| ≥ SLOPE_THRESHOLDS[metric]`.
 
-#### F3: Selección de Métricas
+### 10.4 Overview cacheado y optimización (`get_analysis_overview`)
 
-**Interfaz**: Checklist con 6 opciones
+`get_analysis_overview()` (`@lru_cache(1)`) precalcula baseline + tendencia de cada paciente y métrica.
 
-**Métricas**:
-- ☑ Frecuencia Cardíaca (FC)
-- ☑ Saturación de Oxígeno (SpO2)
-- ☑ Presión Arterial Sistólica (PAS)
-- ☐ Presión Arterial Diastólica (PAD)
-- ☐ Temperatura Corporal
-- ☐ Actividad Diaria (Pasos)
+**Optimización clave:** una versión ingenua que filtra el DataFrame de ~2,3 M filas una vez por cada (paciente, métrica) tardaba ~17,7 s. La versión actual hace **un único `groupby` por métrica** (limpia vectorizadamente y agrupa por IMEI), reduciendo el tiempo a ~1,8 s (≈10×). Además, almacena sólo **parámetros de banda y floats semanales** (kilobytes), no las series crudas.
 
-**Lógica**:
-- Selección múltiple (1-6 métricas)
-- Mínimo 1 métrica requerida
-- Por defecto: FC, SpO2, PAS (las 3 más críticas)
-
-**Código de colores**:
-- Rojo (#FF6B6B): FC
-- Turquesa (#4ECDC4): SpO2
-- Verde (#95E1D3): PAS
-- Rosa (#F38181): PAD
-- Lila (#AA96DA): Temperatura
-- Rosa claro (#FCBAD3): Pasos
-
-#### F4: Modo de Visualización
-
-**Opciones**:
-- ⚪ Overlay: Métricas superpuestas
-- ⚪ Subplots: Gráficos separados
-
-**Default**: Overlay (más intuitivo para visión general)
-
-**Implementación**:
-```python
-if view_mode == "overlay":
-    fig = create_overlaid_figure(data_dict)
-elif view_mode == "subplots":
-    fig = create_subplot_figure(data_dict)
-```
-
-#### F5: Panel de Estadísticas
-
-**Métricas calculadas por variable**:
-- **Mínimo**: Valor más bajo en rango
-- **Máximo**: Valor más alto en rango
-- **Promedio**: Media aritmética
-
-**Visualización**: Cards de Bootstrap con colores de métrica
-
-**Ejemplo**:
-```
-┌─────────────┐ ┌─────────────┐ ┌─────────────┐
-│   FC (BPM)  │ │ SpO2 (%)    │ │  Temp (°C)  │
-│  Min: 68    │ │  Min: 94    │ │  Min: 36.2  │
-│  Max: 102   │ │  Max: 98    │ │  Max: 37.1  │
-│  Avg: 82    │ │  Avg: 96    │ │  Avg: 36.6  │
-└─────────────┘ └─────────────┘ └─────────────┘
-```
-
-#### F6: Información Demográfica del Paciente
-
-**Datos mostrados**:
-- ID de Paciente
-- Género (M/F)
-- Edad (calculada desde fecha de nacimiento)
-- Hospital ID
-
-**Cálculo de edad**:
-```python
-from datetime import date
-
-def calculate_age(birth_date):
-    today = date.today()
-    age = today.year - birth_date.year
-    # Ajustar si cumpleaños no ha ocurrido este año
-    if (today.month, today.day) < (birth_date.month, birth_date.day):
-        age -= 1
-    return age
-```
-
-#### F7: Estados de Carga
-
-**Implementación**: `dcc.Loading` con spinner
-
-**Estados manejados**:
-1. Carga inicial de datos
-2. Cambio de paciente
-3. Actualización de filtros
-4. Cálculo de estadísticas
-
-**Spinner**: Tipo "circle" (Bootstrap estándar)
-
-#### F8: Validación y Mensajes de Error
-
-**Validaciones implementadas**:
-
-| Condición | Mensaje | Acción |
-|-----------|---------|--------|
-| Ningún paciente seleccionado | "Selecciona un paciente" | Gráfico vacío |
-| Sin métricas seleccionadas | "Selecciona al menos 1 métrica" | Gráfico vacío |
-| Fecha inválida | "Rango de fechas inválido" | Gráfico vacío |
-| Sin datos en rango | "No hay datos disponibles" | Gráfico vacío |
-
-**Implementación**:
-```python
-if not patient_id:
-    return empty_figure("Selecciona un paciente"), no_update
-
-if not metrics:
-    return empty_figure("Selecciona al menos 1 métrica"), no_update
-
-if not data_dict or all(df.empty for df in data_dict.values()):
-    return empty_figure("No hay datos disponibles"), no_update
-```
-
-### 9.2 Funcionalidades Avanzadas
-
-#### F9: Caché de Datos LRU
-
-**Problema**: Recargar 109 MB en cada consulta es ineficiente.
-
-**Solución**: `@lru_cache` de Python
-
-```python
-from functools import lru_cache
-
-@lru_cache(maxsize=1)
-def load_all_data():
-    with open("RA.json") as f:
-        data = json.load(f)
-    # Procesamiento...
-    return patients_df, wearable_df
-```
-
-**Beneficios**:
-- Primera carga: ~2-3 segundos
-- Cargas subsecuentes: < 0.01 segundos
-- Mejora de performance: >99%
-
-#### F10: Detección Automática de Rango por Defecto
-
-**Lógica**:
-```python
-# Obtener rango completo de datos del paciente
-min_date, max_date = get_patient_date_range(imei)
-
-# Si hay más de 7 días de datos
-if (max_date - min_date).days >= 7:
-    default_start = max_date - timedelta(days=7)
-    default_end = max_date
-else:
-    # Si hay menos de 7 días, mostrar todo
-    default_start = min_date
-    default_end = max_date
-```
-
-**Justificación**: 7 días es un período clínicamente relevante para monitoreo de tendencias en adultos mayores (recomendación del equipo médico).
-
-#### F11: Responsividad del Layout
-
-**Implementación Bootstrap**:
-- Sidebar: `col-md-3` (25% en desktop)
-- Main content: `col-md-9` (75% en desktop)
-- Breakpoints:
-  - < 768px: Stack vertical (móvil)
-  - ≥ 768px: Columnas lado a lado (tablet/desktop)
-
-**CSS personalizado**:
-```css
-/* assets/custom.css */
-.sidebar {
-    background-color: #2c2c2c;
-    min-height: 100vh;
-    padding: 20px;
-}
-
-.main-content {
-    padding: 20px;
-}
-```
+Funciones derivadas: `get_patient_analysis(patient_id)` y `get_adverse_cohort()` (pacientes con alguna tendencia adversa, ordenados por severidad para *triage*).
 
 ---
 
-## 10. DESAFÍOS TÉCNICOS Y SOLUCIONES
+## 11. COMPONENTES DE VISUALIZACIÓN
 
-### 10.1 Gestión de Zona Horaria
+Todas las figuras se construyen en `src/dash_app/figures.py` con Plotly (`template="plotly_dark"`).
 
-**Desafío**: Los datos originales en MySQL están en UTC, pero necesitan visualizarse en hora local Argentina.
+### 11.1 Figuras del Monitor
 
-**Impacto**:
-- Diferencia de 3 horas
-- Confusión en correlación con eventos clínicos
-- Filtros de fecha/hora incorrectos
+- **`create_overlaid_figure(data_dict, alarm=None)`:** métricas superpuestas en un eje; leyenda horizontal; `hovermode="x unified"`. Con una sola métrica, ajusta el rango Y con padding.
+- **`create_subplot_figure(data_dict, alarm=None)`:** una métrica por subplot con ejes Y independientes; altura `180 * n` (reducida ~10 % respecto de versiones previas para mejor densidad de información); eje X compartido.
+- **`create_temperature_alarm_figure(data_dict, alarm)`:** vista especial cuando se navega desde una alarma de temperatura — temperatura sola arriba (con marcador de alarma) y el resto de métricas superpuestas abajo; altura `270 * n_rows`.
+- **`_add_alarm_marker(fig, alarm, row=None)`:** dibuja una "X" roja con etiqueta del valor en el punto de la alarma.
+- **`_y_range(df)`:** calcula rango Y con 15 % de padding.
+- **`calculate_stats(data_dict)`:** mín, máx y promedio por métrica (reutilizado también por los informes).
 
-**Solución implementada**:
+### 11.2 Figuras del Análisis (nuevas)
 
-```python
-# Paso 1: Marcar datos como UTC al cargar
-wearable_df["record_datetime"] = pd.to_datetime(
-    wearable_df["record_datetime"]
-).dt.tz_localize("UTC")
+- **`create_baseline_figure(df, baseline, metric)`:** banda personal sombreada (relleno `tonexty` entre p10 y p90 por franja), serie de la métrica encima, y puntos fuera del patrón resaltados en naranja (`#db7b65`).
+- **`create_trend_figure(trend, metric)`:** valores semanales + recta de pendiente; la recta se colorea según el estado (naranja `#db7b65` si es adversa, verde `#2fc4b2` si no). La recta se reconstruye desde la pendiente guardada (sin recomputar con numpy).
+- **`trend_badge(trend)`:** devuelve flecha (↑/↓/→) y color para indicadores compactos.
+- **`_empty_dark_fig(height, message)`:** figura vacía con mensaje centrado para estados sin datos.
 
-# Paso 2: Convertir a timezone Argentina
-wearable_df["record_datetime"] = wearable_df["record_datetime"].dt.tz_convert(
-    "America/Argentina/Buenos_Aires"
-)
+### 11.3 Manejo de gaps en series temporales
 
-# Paso 3: Asegurar que filtros también usan timezone correcto
-start_datetime = pd.to_datetime(date_start).tz_localize("America/Argentina/Buenos_Aires")
-```
+`get_filtered_data()` inserta una fila con `value = NaN` un segundo antes de cada salto temporal mayor al umbral entre lecturas consecutivas. El `NaN` rompe la línea en Plotly, evitando que el personal médico asuma continuidad de signos vitales donde no hubo mediciones.
 
-**Resultado**:
-- Todos los timestamps en hora Argentina
-- Filtros funcionan correctamente
-- Correlación precisa con registros médicos locales
+> **Discrepancia detectada (verificada contra el código):** el informe previo y los comentarios indican un umbral de gaps de 15 minutos, pero el código actual en `get_filtered_data` usa `GAP_THRESHOLD_MINUTES = 30`. Adicionalmente, `config.py::TimeConfig.gap_threshold_minutes = 5`, que **no se usa** en la detección de gaps de los gráficos. Recomendación: unificar este valor leyéndolo desde `CFG` para evitar inconsistencias.
 
-**Lecciones aprendidas**:
-- Siempre usar timezone-aware datetimes en aplicaciones médicas
-- Documentar qué timezone usa cada fuente de datos
-- Pandas requiere `tz_localize` (marcar TZ) antes de `tz_convert` (convertir TZ)
+### 11.4 Interactividad y estilo
 
-### 10.2 Filtrado de Rango de Horas con Múltiples Días
-
-**Desafío**: Usuario selecciona día1 21:00 a día2 21:00, pero aparecen gaps entre día1 23:59 y día2 00:00.
-
-**Problema original**:
-```python
-# Código antiguo (incorrecto)
-# Filtraba días y horas por separado
-mask_days = (df["date"] >= date_start) & (df["date"] <= date_end)
-mask_hours = (df["hour"] >= hour_start) & (df["hour"] <= hour_end)
-df = df[mask_days & mask_hours]
-
-# Resultado: día1 [21:00-23:59] + día2 [00:00-21:00]
-# Pero falta día2 [00:00-21:00] por filtro de horas!
-```
-
-**Ejemplo visual del problema**:
-```
-Entrada: día1 21:00 → día2 21:00
-
-Resultado incorrecto:
-día1: [21:00-23:59] ✓
-día2: [00:00-20:59] ✗ (filtrado porque hour<21)
-día2: [21:00-21:00] ✓
-
-Gap entre día1 23:59 y día2 21:00!
-```
-
-**Solución implementada**:
-
-```python
-# Combinar fecha + hora en un solo datetime
-if time_start is not None and time_end is not None:
-    start_datetime = (
-        pd.to_datetime(date_start)
-        .tz_localize("America/Argentina/Buenos_Aires")
-        + pd.Timedelta(hours=time_start)
-    )
-    end_datetime = (
-        pd.to_datetime(date_end)
-        .tz_localize("America/Argentina/Buenos_Aires")
-        + pd.Timedelta(hours=time_end)
-    )
-else:
-    # Sin filtro de horas: días completos
-    start_datetime = pd.to_datetime(date_start).tz_localize(TZ)
-    end_datetime = (
-        pd.to_datetime(date_end).tz_localize(TZ)
-        + pd.Timedelta(days=1)
-        - pd.Timedelta(seconds=1)
-    )
-
-# Filtro único por datetime completo
-mask = (
-    (df["record_datetime"] >= start_datetime) &
-    (df["record_datetime"] <= end_datetime)
-)
-```
-
-**Resultado correcto**:
-```
-día1 21:00:00 → día2 21:00:00 (continuo, sin gaps)
-```
-
-**Lecciones aprendidas**:
-- No filtrar fecha y hora por separado
-- Usar datetime completo para rangos temporales
-- Probar casos edge: mismo día, días consecutivos, semanas
-
-### 10.3 Detección de Gaps en Series Temporales
-
-**Desafío**: Los smartwatches no transmiten datos constantemente. Hay gaps de horas/días sin mediciones.
-
-**Problema**: Plotly por defecto conecta todos los puntos con líneas, creando visualización engañosa.
-
-**Ejemplo visual**:
-```
-Sin detección de gaps:
-  •─────────────•   (línea implica datos continuos)
-08:00         20:00  (pero hay 12h sin mediciones!)
-
-Con detección de gaps:
-  •             •   (sin línea = sin datos)
-08:00         20:00  (claro que hay ausencia de datos)
-```
-
-**Solución implementada**:
-
-```python
-# Paso 1: Calcular diferencias temporales
-df = df.sort_values("record_datetime")
-time_diff = df["record_datetime"].diff()
-
-# Paso 2: Identificar gaps >15 minutos
-GAP_THRESHOLD = pd.Timedelta(minutes=15)
-gaps = time_diff > GAP_THRESHOLD
-
-# Paso 3: Insertar filas con NaN antes de cada gap
-gap_rows = []
-for idx in gaps[gaps].index:
-    gap_time = df.loc[idx, "record_datetime"] - pd.Timedelta(seconds=1)
-    gap_rows.append({
-        "record_datetime": gap_time,
-        "value": np.nan  # NaN rompe la línea en Plotly
-    })
-
-# Paso 4: Combinar datos originales + gaps
-df = pd.concat([df, pd.DataFrame(gap_rows)])
-df = df.sort_values("record_datetime").reset_index(drop=True)
-```
-
-**Parámetros**:
-- **Gap threshold**: 15 minutos
-- **Justificación**: Sample period normal es 5 min, entonces 3x = 15 min indica pérdida de datos
-
-**Impacto clínico**:
-- Evita que el personal médico asuma signos vitales estables donde no hay datos
-- Facilita identificación de períodos sin monitoreo
-- Mejora precisión en interpretación de gráficos
-
-**Lecciones aprendidas**:
-- Las visualizaciones médicas requieren claridad sobre ausencia de datos
-- NaN es la forma estándar de romper líneas en Plotly
-- El threshold debe basarse en el período de muestreo esperado
-
-### 10.4 Performance con Datasets Grandes
-
-**Desafío**: 271,632 registros × 6 métricas = 1.6M+ puntos de datos potenciales.
-
-**Problema**: Render de gráficos lentos, especialmente en modo subplot.
-
-**Soluciones implementadas**:
-
-#### Solución 1: Caché LRU
-```python
-@lru_cache(maxsize=1)
-def load_all_data():
-    # Solo carga una vez
-```
-**Impacto**: Reduce tiempo de carga de 2-3s a <0.01s.
-
-#### Solución 2: Filtrado Temprano
-```python
-# Filtrar en Pandas antes de enviar a Plotly
-mask = (
-    (df["imei"] == imei) &
-    (df["metric"] == metric) &
-    (df["record_datetime"] >= start) &
-    (df["record_datetime"] <= end)
-)
-df = df[mask]  # Solo puntos relevantes a Plotly
-```
-
-#### Solución 3: Plotly WebGL
-```python
-# Para datasets >10k puntos, usar Scattergl
-if len(df) > 10000:
-    trace = go.Scattergl(...)  # GPU rendering
-else:
-    trace = go.Scatter(...)    # SVG rendering
-```
-
-**Nota**: No implementado en v1.0, pero preparado para futuro.
-
-#### Solución 4: Limitar Rango por Defecto
-- Default: Últimos 7 días (no todo el histórico)
-- Reduce puntos típicos de ~270k a ~2-3k
-- Usuario puede expandir si necesita
-
-**Resultados**:
-- Tiempo de render: < 1 segundo para rango típico (7 días)
-- Interacciones (zoom, pan): < 100ms
-- Aplicación se siente "instantánea"
-
-### 10.5 Validación de Entrada de Usuario
-
-**Desafío**: Múltiples estados de UI pueden llevar a combinaciones inválidas.
-
-**Casos manejados**:
-
-| Caso | Validación | Acción |
-|------|------------|--------|
-| Sin paciente | `if not patient_id` | Mostrar placeholder |
-| Sin métricas | `if not metrics or len(metrics) == 0` | Mensaje error |
-| Fecha fin < inicio | `if date_end < date_start` | Mensaje error |
-| Sin datos en rango | `if data_dict is empty` | Mensaje informativo |
-
-**Implementación**:
-```python
-def update_graph(...):
-    # Validación 1: Paciente
-    if not patient_id:
-        return empty_figure("Selecciona un paciente"), no_update
-
-    # Validación 2: Métricas
-    if not metrics:
-        return empty_figure("Selecciona al menos 1 métrica"), no_update
-
-    # Validación 3: Fechas
-    if pd.to_datetime(date_end) < pd.to_datetime(date_start):
-        return empty_figure("Fecha de fin debe ser >= fecha de inicio"), no_update
-
-    # Validación 4: Datos disponibles
-    if not data_dict or all(df.empty for df in data_dict.values()):
-        return empty_figure("No hay datos disponibles para este rango"), no_update
-```
-
-**Función helper**:
-```python
-def empty_figure(message):
-    """Retorna figura vacía con mensaje centrado."""
-    return {
-        "data": [],
-        "layout": {
-            "xaxis": {"visible": False},
-            "yaxis": {"visible": False},
-            "annotations": [{
-                "text": message,
-                "xref": "paper",
-                "yref": "paper",
-                "showarrow": False,
-                "font": {"size": 20, "color": "#7f7f7f"}
-            }]
-        }
-    }
-```
-
-**Beneficio**: UI robusta, sin crashes, mensajes claros al usuario.
+Plotly aporta zoom, pan, hover, exportación PNG y leyenda interactiva de forma nativa. El estilo oscuro reduce la fatiga visual en guardias. `assets/custom.css` ajusta: color de dropdowns (paciente en tono salmón, horas en azul oscuro), tabla compacta, y el escalado/posición de los calendarios — el de **Fecha Inicio abre a la derecha** y el de **Fecha Fin a la izquierda** (ambos escalados a 0.55) para que no queden tapados.
 
 ---
 
-## 11. RESULTADOS Y ESTADO ACTUAL
+## 12. INFORMES DESCARGABLES
 
-### 11.1 Funcionalidades Completadas ✅
+Implementados en `src/reports.py` (subsistema nuevo). Pensados para una Pi *headless*: `matplotlib` usa el backend **"Agg"** (sin display, fijado **antes** de importar `pyplot`) y `fpdf2` es pura-Python. Las figuras se cierran siempre (`plt.close`) para no acumular memoria. Para Unicode (°C, acentos) se usa la fuente **DejaVuSans** que viene con matplotlib.
 
-| Funcionalidad | Estado | Observaciones |
-|---------------|--------|---------------|
-| Carga de datos desde JSON | ✅ | Con caché LRU |
-| Selector de pacientes | ✅ | 25 pacientes disponibles |
-| Filtrado por rango de fechas | ✅ | Con calendario |
-| Filtrado por rango de horas | ✅ | 00:00-23:00 |
-| Selección de métricas | ✅ | Hasta 6 simultáneas |
-| Gráfico modo overlay | ✅ | Múltiples métricas superpuestas |
-| Gráfico modo subplots | ✅ | Ejes Y independientes |
-| Cálculo de estadísticas | ✅ | Min, max, promedio |
-| Detección de gaps | ✅ | Threshold 15 min |
-| Conversión timezone | ✅ | UTC → Argentina |
-| Información demográfica | ✅ | ID, género, edad, hospital |
-| Tema oscuro | ✅ | Bootstrap DARKLY |
-| Interactividad (zoom, pan, hover) | ✅ | Nativo de Plotly |
-| Validación de inputs | ✅ | Mensajes de error claros |
-| Estados de carga | ✅ | Spinner durante procesamiento |
+### 12.1 Informe por paciente
 
-### 11.2 Métricas del Proyecto
+Usa la selección del monitor (paciente, rango de fechas/horas, métricas).
 
-**Código**:
-- **Archivos Python**: 8 módulos
-- **Líneas de código**: ~1,500 (estimado)
-- **Funciones principales**: ~15
-- **Callbacks Dash**: 2
+- **`build_patient_csv(...)`:** formato largo con columnas `fecha_hora, metrica, unidad, valor, fuera_de_rango` (la última marca "no"/"bajo"/"alto" según los umbrales).
+- **`build_patient_pdf(...)`:** cabecera del paciente (ID, género, edad, hospital, rango, fecha de generación), tabla de estadísticas (mín/máx/prom por métrica), tabla de **eventos de alarma agrupados** y, para cada evento, un mini-gráfico de esa métrica en una ventana de **±2 horas** alrededor del evento (`_render_alarm_chart_png`), con tope de **12 gráficos** (`MAX_ALARM_CHARTS`). El gráfico marca el rango normal sombreado y resalta en rojo los puntos fuera de rango.
+- Las alarmas del PDF se obtienen con `get_patient_alarm_history` filtradas al rango y a las métricas seleccionadas, y se agrupan con `group_consecutive_alarms`.
 
-**Datos**:
-- **Pacientes**: 25 registros
-- **Mediciones**: 271,632 registros
-- **Métricas**: 6 tipos
-- **Rango temporal**: 54 días (Dic 2024 - Ene 2026)
-- **Tamaño dataset**: 109 MB (JSON)
+### 12.2 Informe de cohorte (resumen)
 
-**Performance**:
-- **Carga inicial**: ~2-3 segundos
-- **Cambio de paciente**: < 0.5 segundos
-- **Actualización de gráfico**: < 1 segundo (rango 7 días)
-- **Interacciones**: < 100ms
+- **`build_summary_csv()`** y **`build_summary_pdf()`:** tabla de todos los pacientes con sus últimos valores (FC, SpO2, temperatura, presión sistólica) y estado de alerta; en el PDF, las filas con alerta se resaltan con fondo rojizo.
 
-**Documentación**:
-- **CLAUDE.md**: Contexto del proyecto (22 KB)
-- **DISENO_GUI.md**: Especificaciones UI/UX (23 KB)
-- **INFORME_TECNICO.md**: Este informe (~50 KB)
+### 12.3 Mecanismo de descarga
 
-### 11.3 Capturas de Pantalla
+Vía `dcc.Download` en los callbacks (`download_patient_report`, `download_summary_report`):
 
-#### Interfaz Principal
-```
-┌──────────────────────────────────────────────────────────┐
-│  VITAICARE - Monitor de Pacientes                        │
-├────────────────┬─────────────────────────────────────────┤
-│ Selecciona:    │  [Gráfico interactivo con 3 métricas]  │
-│ Paciente 005   │   • Línea roja: Frecuencia Cardíaca    │
-│                │   • Línea azul: SpO2                    │
-│ ┌────────────┐ │   • Línea verde: Presión Sistólica     │
-│ │ ID: 005    │ │                                         │
-│ │ Género: M  │ │  [Leyenda interactiva]                 │
-│ │ Edad: 80   │ │  [Controles: zoom, pan, download]      │
-│ │ Hosp: RA_5 │ │                                         │
-│ └────────────┘ │                                         │
-│                │ ┌─────┐ ┌─────┐ ┌─────┐                │
-│ Fecha inicio:  │ │ Min │ │ Max │ │ Avg │                │
-│ 2026-01-19     │ │ 68  │ │ 102 │ │ 82  │ FC (BPM)      │
-│                │ └─────┘ └─────┘ └─────┘                │
-│ Fecha fin:     │ ┌─────┐ ┌─────┐ ┌─────┐                │
-│ 2026-01-26     │ │ 94  │ │ 98  │ │ 96  │ SpO2 (%)      │
-│                │ └─────┘ └─────┘ └─────┘                │
-│ Hora inicio: 16│                                         │
-│ Hora fin: 21   │                                         │
-│                │                                         │
-│ Métricas:      │                                         │
-│ ☑ FC           │                                         │
-│ ☑ SpO2         │                                         │
-│ ☑ PAS          │                                         │
-│ ☐ PAD          │                                         │
-│ ☐ Temp         │                                         │
-│ ☐ Pasos        │                                         │
-│                │                                         │
-│ Vista:         │                                         │
-│ ⦿ Overlay      │                                         │
-│ ○ Subplots     │                                         │
-└────────────────┴─────────────────────────────────────────┘
-```
+- **CSV** con **BOM UTF-8** (`"﻿" + df.to_csv()`) para que Excel muestre bien los acentos.
+- **PDF** con `dcc.send_bytes`.
+- `import reports` es **perezoso** dentro del callback, para no cargar matplotlib en el arranque y bajar la RAM inicial en la Pi.
 
-### 11.4 Casos de Uso Validados
-
-#### Caso 1: Monitoreo Semanal de Paciente
-**Escenario**: Enfermera revisa evolución de signos vitales de último semana.
-
-**Flujo**:
-1. Selecciona paciente → Se cargan últimos 7 días por defecto
-2. Métricas: FC, SpO2, Temp
-3. Modo: Overlay para vista general
-4. Resultado: Gráfico muestra tendencias semanales
-
-**Tiempo total**: < 10 segundos
-
-#### Caso 2: Análisis de Evento Específico
-**Escenario**: Médico investiga descompensación ocurrida el 20/01 entre 18:00-22:00.
-
-**Flujo**:
-1. Selecciona paciente
-2. Fecha inicio: 20/01, Hora inicio: 18
-3. Fecha fin: 20/01, Hora fin: 22
-4. Métricas: Todas (6)
-5. Modo: Subplots para lectura precisa
-6. Identifica: SpO2 bajó a 88% a las 19:30, FC subió a 115
-
-**Tiempo total**: < 30 segundos
-
-#### Caso 3: Comparación de Patrones Nocturnos
-**Escenario**: Investigar si patrones de sueño están relacionados con SpO2.
-
-**Flujo**:
-1. Selecciona paciente
-2. Rango: 19/01 - 23/01
-3. Hora inicio: 22, Hora fin: 6 (nocturno)
-4. Métricas: FC, SpO2
-5. Modo: Overlay
-6. Observa: Correlación entre caídas de SpO2 y aumentos de FC
-
-**Tiempo total**: < 15 segundos
-
-### 11.5 Feedback del Equipo Médico (Preliminar)
-
-**Aspectos valorados** (de reuniones de requerimientos):
-- ✅ Facilidad de uso: "Intuitivo, no requiere capacitación"
-- ✅ Visualización clara: "Gráficos fáciles de interpretar"
-- ✅ Filtros útiles: "Rango de horas es muy útil para turnos"
-- ✅ Tema oscuro: "Reduce cansancio visual en guardias nocturnas"
-
-**Sugerencias para v2.0**:
-- ⚠️ Agregar alertas automáticas para valores fuera de rango
-- ⚠️ Exportar gráficos a PDF para historias clínicas
-- ⚠️ Comparación entre pacientes (análisis poblacional)
-- ⚠️ Integración con eventos clínicos (registros de enfermería)
+UI: selector de formato (PDF/CSV) + botón "Descargar" en la barra lateral del monitor; "Descargar resumen" en el dashboard.
 
 ---
 
-## 12. TRABAJO FUTURO
+## 13. AUTENTICACIÓN Y SEGURIDAD
 
-### 12.1 Mejoras Planificadas (v2.0)
+Implementada en `src/auth.py` y `gestionar_usuarios.py` (subsistema nuevo). Login por **sesión de Flask** sobre el mismo servidor que usa Dash.
 
-#### P1: Sistema de Alertas
-**Descripción**: Notificaciones cuando variables salen de rango normal.
+### 13.1 Guard de sesión (`init_auth`)
 
-**Implementación propuesta**:
-```python
-def check_alerts(df, metric):
-    config = METRICS[metric]
-    alerts = []
+- `@server.before_request` (`require_login`) intercepta toda petición: si la ruta no es pública (`/login`, `/logout`) y no hay sesión, redirige a `/login`; para peticiones internas de Dash (`/_dash`, `/_reload`, que son XHR) devuelve **401** en lugar de redirigir, para no romper el front.
+- Rutas: `/login` (formulario HTML embebido con estilo propio) y `/logout` (limpia la sesión).
+- **Secret key persistente:** se lee/genera en `.flask_secret` (`secrets.token_hex(32)`, permisos 600). Persistirla evita desloguear a todos en cada reinicio del servicio.
+- Cookies de sesión con `SESSION_COOKIE_HTTPONLY=True` y `SESSION_COOKIE_SAMESITE="Lax"`.
 
-    if config.get("normal_min"):
-        low_values = df[df["value"] < config["normal_min"]]
-        for idx, row in low_values.iterrows():
-            alerts.append({
-                "type": "low",
-                "metric": metric,
-                "value": row["value"],
-                "time": row["record_datetime"],
-                "threshold": config["normal_min"]
-            })
+### 13.2 Almacén de usuarios
 
-    # Similar para normal_max
-    return alerts
-```
+- Usuarios en `users.json` con contraseñas hasheadas por `werkzeug.security` (`generate_password_hash` / `check_password_hash`). El archivo está **gitignoreado** (no se sube ni el deploy lo pisa) y se guarda con permisos **600**.
+- Funciones: `add_user`, `delete_user`, `list_users`, `user_exists`, `verify`.
 
-**UI**: Panel de alertas en sidebar con badge de contador.
+### 13.3 Gestión de usuarios por CLI (`gestionar_usuarios.py`)
 
-#### P2: Exportación a PDF
-**Descripción**: Generar reportes con gráficos y estadísticas para historia clínica.
+CLI con subcomandos `add` / `list` / `delete`; la contraseña se pide por `getpass` (oculta) y se valida (coincidencia y longitud mínima de 6). Se ejecuta por SSH en la Pi: **como sólo la administradora tiene acceso SSH, sólo ella crea usuarios** (no hay registro abierto en la web). El navbar incluye el enlace "Cerrar sesión".
 
-**Tecnologías**:
-- `plotly.io.to_image()`: Convertir gráficos a PNG
-- `reportlab`: Generar PDF con imágenes + texto
+### 13.4 Postura de seguridad
 
-**Contenido del reporte**:
-- Datos del paciente
-- Rango de fechas analizado
-- Gráficos de métricas
-- Tabla de estadísticas
-- Alertas identificadas
-- Firma digital (fecha/hora de generación)
-
-#### P3: Comparación de Pacientes
-**Descripción**: Visualizar métricas de múltiples pacientes simultáneamente.
-
-**Casos de uso**:
-- Análisis poblacional (ej: promedio de FC por edad)
-- Identificar outliers
-- Evaluación de intervenciones (antes/después)
-
-**UI**: Selector múltiple de pacientes + gráficos con trazas por paciente.
-
-#### P4: Integración con Eventos Clínicos
-**Descripción**: Marcar en gráficos eventos como administración de medicamentos, caídas, etc.
-
-**Implementación**:
-```python
-# Agregar annotations de Plotly
-fig.add_vline(
-    x=event_datetime,
-    line_dash="dash",
-    annotation_text="Medicación administrada"
-)
-```
-
-**Fuente de datos**: Tabla `clinical_events` (a crear en MySQL).
-
-#### P5: Detección de Patrones Anómalos (ML)
-**Descripción**: Algoritmos de machine learning para identificar desviaciones.
-
-**Técnicas**:
-- **Isolation Forest**: Detectar outliers
-- **LSTM**: Predecir valores futuros, alertar si desviación
-- **Clustering**: Agrupar patrones similares
-
-**Ejemplo**:
-```python
-from sklearn.ensemble import IsolationForest
-
-model = IsolationForest(contamination=0.1)
-df["anomaly"] = model.fit_predict(df[["value"]])
-
-# Marcar anomalías en gráfico con color diferente
-```
-
-### 12.2 Optimizaciones Técnicas
-
-#### O1: Base de Datos en Producción
-**Actual**: Lectura de archivo JSON (109 MB).
-
-**Propuesta**: Migrar a MySQL en producción.
-
-**Ventajas**:
-- Consultas más rápidas con índices
-- Menor uso de memoria
-- Actualizaciones en tiempo real
-- Soporte de múltiples usuarios concurrentes
-
-**Cambios requeridos**:
-```python
-# Reemplazar load_all_data()
-def load_all_data():
-    conn = mysql.connector.connect(**DB_CONFIG)
-    patients_df = pd.read_sql("SELECT * FROM patients", conn)
-    # Query solo rango necesario:
-    wearable_df = pd.read_sql(
-        "SELECT * FROM wearabledata WHERE record_datetime >= %s",
-        conn,
-        params=[date_start]
-    )
-    return patients_df, wearable_df
-```
-
-#### O2: Servidor de Producción
-**Actual**: Dash development server (solo localhost).
-
-**Propuesta**: Despliegue con Gunicorn + Nginx.
-
-**Configuración**:
-```bash
-# gunicorn_config.py
-bind = "0.0.0.0:8050"
-workers = 4
-worker_class = "sync"
-timeout = 120
-
-# Nginx reverse proxy
-location / {
-    proxy_pass http://localhost:8050;
-    proxy_set_header Host $host;
-}
-```
-
-#### O3: Autenticación de Usuarios
-**Descripción**: Login para personal médico autorizado.
-
-**Tecnología**: `dash-auth` o Flask-Login.
-
-**Roles propuestos**:
-- **Médico**: Acceso completo
-- **Enfermero**: Acceso a visualización (sin configuración)
-- **Admin**: Gestión de usuarios y dispositivos
-
-#### O4: Logging y Auditoría
-**Descripción**: Registrar accesos y acciones para seguridad y análisis.
-
-**Información a logar**:
-- Usuario que accedió
-- Paciente consultado
-- Rango de fechas/horas
-- Timestamp de consulta
-
-**Implementación**:
-```python
-import logging
-
-logging.basicConfig(
-    filename='vitaicare.log',
-    level=logging.INFO,
-    format='%(asctime)s - %(user)s - %(action)s - %(patient_id)s'
-)
-
-@app.callback(...)
-def update_graph(patient_id, ...):
-    logging.info(f"User {current_user} viewed patient {patient_id}")
-    # ... resto del código
-```
-
-### 12.3 Escalabilidad a Otros Centros
-
-**Objetivo**: Adaptar la plataforma para uso en otras residencias geriátricas.
-
-**Requisitos**:
-1. **Multi-tenancy**: Soporte de múltiples instituciones en una instancia
-2. **Configuración flexible**: Métricas, rangos normales por institución
-3. **Documentación**: Manual de instalación y configuración
-4. **Capacitación**: Materiales de entrenamiento para usuarios
-
-**Modelo de datos**:
-```python
-# Agregar campo institution_id
-patients = {
-    "patient_id": "001",
-    "institution_id": "RA_BsAs",  # Residencia Asturiana Buenos Aires
-    ...
-}
-
-# Filtrar por institución en consultas
-df = df[df["institution_id"] == current_institution]
-```
+La protección efectiva es **el login de la aplicación + el cifrado HTTPS del túnel** (Tailscale Funnel; ver §15). Los datos están anonimizados conforme al protocolo del proyecto. La app sirve HTTP en la Pi; el cifrado lo aporta el túnel de borde.
 
 ---
 
-## 13. CONCLUSIONES
+## 14. ESTRUCTURA DE LA APLICACIÓN DASH
 
-### 13.1 Objetivos Cumplidos
+### 14.1 Punto de entrada (`app.py`)
 
-Este proyecto ha logrado desarrollar exitosamente una interfaz de usuario funcional para la visualización de datos biométricos de adultos mayores institucionalizados. Los principales logros incluyen:
+- Precarga `load_all_data()` y **precalienta** `get_patients_summary()` y `get_analysis_overview()` al arrancar, de modo que la primera visita ya sea instantánea (los cálculos pesados quedan cacheados).
+- Crea la app Dash con tema DARKLY y `suppress_callback_exceptions=True`.
+- Llama a `init_auth(app)` para proteger toda la app.
+- Expone `server = app.server` para gunicorn (`app:server`).
+- `app.run(host, port, debug)` configurable por variables de entorno `HOST` (default `0.0.0.0`), `PORT` (8050), `DEBUG` (false).
 
-1. **Interfaz web operativa** con 15+ funcionalidades implementadas
-2. **Arquitectura modular** que facilita mantenimiento y extensión
-3. **Procesamiento eficiente** de 271,632 registros con tiempos de respuesta < 1 segundo
-4. **Visualizaciones clínicamente relevantes** con detección de gaps y manejo de zonas horarias
-5. **Diseño centrado en el usuario** validado con equipo médico de la Residencia Asturiana
+### 14.2 Layout y routing (`layout.py`)
 
-### 13.2 Contribuciones del Proyecto
+`create_layout()` define el navbar (Dashboard, Monitor Paciente, Cerrar sesión), un `dcc.Location` para el routing y dos `dcc.Store` de sesión: `selected-patient-store` y `alarm-context-store`.
 
-#### Técnicas
-- Implementación de pipeline completo de datos: MySQL → JSON → Pandas → Plotly
-- Solución de desafíos técnicos complejos (timezone, gaps, filtrado temporal)
-- Arquitectura escalable preparada para machine learning y alertas
+### 14.3 Páginas
 
-#### Clínicas
-- Herramienta práctica para toma de decisiones médicas diarias
-- Facilita identificación temprana de cambios en estado de salud
-- Reduce tiempo de análisis de signos vitales (de minutos a segundos)
+- **`pages/dashboard.py`:** panel de alertas (tarjetas, máx. 6), tabla resumen de pacientes (FC, SpO2, temperatura, presión sistólica, estado, botón de historial), modal de historial de alarmas (con filtro de métrica y "cargar semana anterior"), y barra de descarga del resumen.
+- **`pages/patient_monitor.py`:** barra lateral con paciente, **Fecha Inicio/Fin lado a lado**, **Hora Inicio/Fin lado a lado**, checklist de métricas, modo de visualización (Superpuesto/Subplots) y descarga de informe; área principal con el botón "Tendencias y patrones" arriba, tarjetas de estadística, gráfico principal a **58vh**, y un `dbc.Collapse` con el análisis profundo (línea base personalizada + tendencias semanales del paciente).
 
-#### Académicas
-- Documentación exhaustiva del proceso de desarrollo
-- Caso de estudio de ingeniería biomédica aplicada
-- Metodología replicable en otras instituciones
+### 14.4 Callbacks (`callbacks.py`)
 
-### 13.3 Aprendizajes Clave
-
-1. **Importancia del contexto clínico**: Las decisiones técnicas (ej: detección de gaps) deben basarse en requerimientos médicos reales.
-
-2. **Diseño iterativo**: La arquitectura modular permitió incorporar cambios durante desarrollo sin refactorización mayor.
-
-3. **Performance crítica en salud**: Tiempos de respuesta < 1s son esenciales para aceptación del usuario en contexto clínico.
-
-4. **Visualización ≠ solo gráficos bonitos**: La claridad sobre ausencia de datos es tan importante como los datos mismos.
-
-5. **Zona horaria es crítica**: En aplicaciones médicas, timestamps incorrectos pueden llevar a decisiones erróneas.
-
-### 13.4 Impacto Esperado
-
-#### Corto plazo (3-6 meses)
-- Adopción por equipo de enfermería para monitoreo diario
-- Reducción de tiempo de análisis de signos vitales
-- Mejora en documentación de eventos clínicos
-
-#### Mediano plazo (6-12 meses)
-- Expansión a otras instituciones (objetivo de escalabilidad)
-- Implementación de alertas automáticas
-- Integración con historia clínica electrónica
-
-#### Largo plazo (1-2 años)
-- Análisis poblacional y estudios epidemiológicos
-- Modelos predictivos con machine learning
-- Publicaciones científicas sobre patrones identificados
-
-### 13.5 Reflexión Personal
-
-Este proyecto representa una aplicación directa de ingeniería en bioingeniería para resolver una problemática real en el sistema de salud. La colaboración con el equipo médico de la Residencia Asturiana y la Universidad de Alcalá ha sido fundamental para asegurar que la solución técnica responda a necesidades clínicas genuinas.
-
-El desarrollo de VITAICARE ha reforzado la importancia de:
-- **Comunicación interdisciplinaria** entre ingenieros y profesionales de salud
-- **Diseño centrado en el usuario** en aplicaciones médicas
-- **Responsabilidad ética** en el manejo de datos sensibles de pacientes
-- **Rigor técnico** en desarrollo de software para salud
-
-### 13.6 Palabras Finales
-
-VITAICARE representa un paso significativo hacia la digitalización del monitoreo geriátrico en instituciones argentinas. Si bien quedan funcionalidades por implementar (alertas, ML, exportación), la base técnica está sólida y lista para evolución.
-
-El código está documentado, modularizado y versionado con Git, facilitando su mantenimiento y extensión por futuros desarrolladores o estudiantes.
-
-Este proyecto demuestra que con las herramientas y metodologías adecuadas, es posible desarrollar soluciones de e-salud de calidad profesional en contexto académico, con potencial de impacto real en la calidad de atención de adultos mayores.
+- **Routing** `display_page`: `/patient` → monitor, cualquier otra ruta → dashboard.
+- **Dashboard:** `update_dashboard` (paneles de alertas y tabla), `navigate_to_patient` (clic en tarjeta/badge/fila navega al monitor y, si viene de una alarma, fija el contexto).
+- **Monitor:** `update_patient_info` (info demográfica, rangos de fecha disponibles, defaults — por defecto últimos 7 días o, si viene de una alarma, ventana ±2 h centrada en el evento) y `update_graph` (valida selección y rango, arma `data_dict`, elige la figura según modo/alarma, calcula estadísticas).
+- **Historial de alarmas:** `toggle_alarm_history_modal`, `load_more_weeks`, `populate_alarm_history` (agrupa con `group_consecutive_alarms` y arma la tabla), `navigate_from_alarm` (el botón "Ver" navega al gráfico del evento).
+- **Descargas:** `download_patient_report` y `download_summary_report` (import perezoso de `reports`, BOM en CSV, `send_bytes` en PDF).
+- **Análisis:** `toggle_deep_analysis` (abre/cierra el Collapse) y `update_deep_analysis` (calcula sólo si está abierto; usa las últimas 2 semanas para el gráfico de banda personal).
 
 ---
 
-## 14. REFERENCIAS Y RECURSOS
+## 15. DESPLIEGUE EN RASPBERRY PI
 
-### 14.1 Bibliografía Técnica
+Subsistema nuevo y central para el objetivo de escalabilidad.
 
-1. **Dash Documentation**
-   Plotly Technologies Inc. (2024)
-   https://dash.plotly.com/
-   Framework principal utilizado
+### 15.1 Hardware y SO
 
-2. **Plotly Python Graphing Library**
-   Plotly Technologies Inc. (2024)
-   https://plotly.com/python/
-   Documentación de gráficos interactivos
+- **Raspberry Pi 4 (2 GB)**, hostname `pececito`, usuario `ro`.
+- **Raspberry Pi OS 13 "Trixie"** (basado en Debian), arquitectura **aarch64** (64 bits) — necesaria para instalar *wheels* precompiladas de pandas/numpy/pyarrow.
 
-3. **Pandas Documentation**
-   pandas development team (2024)
-   https://pandas.pydata.org/docs/
-   Manipulación de series temporales
+### 15.2 Servidor de producción (`deploy/vitaicare.service`)
 
-4. **Bootstrap Themes**
-   Bootstrap team (2024)
-   https://bootswatch.com/darkly/
-   Tema DARKLY utilizado
+`gunicorn` corriendo como servicio **systemd**, con arranque automático al boot:
 
-### 14.2 Bibliografía Clínica
+```
+ExecStart=.../.venv/bin/gunicorn --workers 1 --threads 2 --timeout 120 \
+          --bind 0.0.0.0:8050 app:server
+Restart=on-failure
+```
 
-5. **Manual del reloj ID Vita**
-   Intelligent Data (2024)
-   Manual de usuario del smartwatch utilizado
+- **Un solo worker a propósito:** cada worker carga toda la serie en RAM; más de uno provocaría OOM en 2 GB.
+- 2 threads para concurrencia de E/S; timeout de 120 s para descargas/PDF pesados.
+- Sirve HTTP en el puerto 8050; el cifrado lo aporta el túnel de borde (§15.4).
+- Se recomienda ampliar el *swap* a 2 GB en la Pi (documentado en `README_RASPBERRY.md`).
 
-6. **Clark, M. (2023)**
-   "Single-Use Wearable Wireless Sensors for Vital Sign Monitoring"
-   Canadian Journal of Health Technologies
-   Referencia sobre sensores wearables
+### 15.3 Despliegue desde Windows (PowerShell)
 
-7. **Moore, K. et al. (2021)**
-   "Older Adults' Experiences With Using Wearable Devices"
-   JMIR mHealth and uHealth
-   Experiencias de adultos mayores con wearables
+- **`deploy/deploy.ps1`:** sincroniza el repo a `~/newpacientes` en la Pi. Arma la lista de archivos con `git ls-files` (respeta `.gitignore`), **agrega explícitamente los Parquet** (que están gitignoreados) y **descarta archivos borrados aún en el índice** para que `tar` no falle. Autodetecta el backend en orden: **rsync nativo** → **rsync en WSL** → **tar + scp** (este último no requiere instalar nada; usa herramientas integradas de Windows 10/11). Excluye `.git`, `.venv`, `__pycache__`, `RA.json`, `RA.sql`, `.vscode`, `.claude`. Admite `-DryRun`, `-Port`, `-IdentityFile`, `-NoDelete`.
+- **`deploy/actualizar-datos.ps1`:** ejecuta todo el ciclo en un comando — `RA.sql → RA.json` (paso 1), `RA.json → Parquet` (paso 2), deploy a la Pi (paso 3) y `systemctl restart vitaicare` (paso 4, imprescindible para limpiar la caché y recargar datos nuevos). Los pasos 1–2 son pesados en RAM y por eso se hacen en la PC, no en la Pi.
+- Ambos scripts usan por defecto la **IP de Tailscale `100.99.247.65`** y el usuario `ro`, con **autenticación por clave SSH** (sin contraseña). `actualizar-datos.ps1` documenta `192.168.1.88` como ejemplo de IP local en su ayuda.
 
-8. **Khairat, S. S. et al. (2018)**
-   "The Impact of Visualization Dashboards on Quality of Care"
-   JMIR Human Factors
-   Impacto de dashboards en calidad de atención
+> **Discrepancia menor (verificada contra el código):** el comentario de cabecera de `actualizar-datos.ps1` menciona `192.168.1.88` como default de `-Address`, pero el valor por defecto real del parámetro es la IP de Tailscale `100.99.247.65`. El comportamiento efectivo es el de Tailscale.
 
-9. **Dowding, D. et al. (2019)**
-   "Usability Evaluation of a Dashboard for Home Care Nurses"
-   CIN: Computers, Informatics, Nursing
-   Evaluación de usabilidad en dashboards de salud
+```
+   PC Windows (RAM de sobra)                 Raspberry Pi 4 (2 GB)
+ ┌───────────────────────────┐            ┌──────────────────────────┐
+ │ RA.sql ─► RA.json ─► .parquet │  SSH/scp │  ~/newpacientes/          │
+ │ deploy.ps1 / actualizar-datos │ ───────► │  .venv + Parquet         │
+ └───────────────────────────┘            │  systemd → gunicorn:8050 │
+                                           └──────────────────────────┘
+```
 
-### 14.3 Recursos del Proyecto
+### 15.4 Acceso remoto
 
-10. **Repositorio Git**
-    github.com/[username]/vitaicare-newpacientes (si es público)
-    Código fuente completo
+Tres mecanismos complementarios:
 
-11. **Anteproyecto VITAICARE**
-    Pesoa, R. (2024)
-    Anteproyecto_PESOA__PROYECTO_VITAICARE_corregido.pdf
-    Documento de propuesta original
+1. **rpi-connect** (Raspberry Pi Connect): terminal/escritorio remoto de la administradora vía `connect.raspberrypi.com`.
+2. **Tailscale** (VPN *mesh* sobre WireGuard): la Pi `pececito` y la laptop `msi` en la misma *tailnet* (IPs `100.x`) para acceso privado dentro y fuera de la institución, con IP estable.
+3. **Tailscale Funnel:** expone el dashboard públicamente con **HTTPS** en `https://pececito.tailda6dee.ts.net`, con un **dominio propio** `https://vitaicare.whittileaks.com` al frente.
 
-12. **CLAUDE.md**
-    Contexto del proyecto y directrices de desarrollo
-    22 KB de documentación interna
+La protección de extremo a extremo combina el **login de la app** con el **HTTPS del túnel**; los datos están anonimizados.
 
-13. **DISENO_GUI.md**
-    Especificaciones de diseño de interfaz
-    23 KB con mockups y decisiones de UX
+---
 
-### 14.4 Herramientas Utilizadas
+## 16. DESAFÍOS TÉCNICOS
 
-| Herramienta | Versión | Propósito |
-|-------------|---------|-----------|
-| Python | 3.14 | Lenguaje de programación |
-| Dash | 2.14+ | Framework web |
-| Plotly | 5.18+ | Visualizaciones |
-| Pandas | Latest | Análisis de datos |
-| Git | 2.x | Control de versiones |
-| VSCode | Latest | IDE de desarrollo |
-| Claude Code | Latest | Asistencia en desarrollo |
+### 16.1 Memoria en hardware de bajo costo (el desafío central)
 
-### 14.5 Datasets
+Cargar 2,36 M de registros desde JSON agota la RAM de una Pi de 2 GB. **Solución:** pipeline a Parquet con reducción de columnas y conversión hecha en la PC (ver §5). Resultado: el DataFrame completo entra con ~280 MB.
 
-**RA.json**
-109 MB, 271,632 registros
-Fuente: Residencia Asturiana de Buenos Aires
-Período: Diciembre 2024 - Enero 2026
-Formato: JSON con 4 tablas (patients, wearabledata, perceivedhealthdata, labresults)
+### 16.2 Alarmas redundantes en condiciones sostenidas
 
-### 14.6 Estándares y Guías
+Una condición fuera de rango muestreada cada 5 min generaría decenas de alarmas. **Solución de dos niveles:** enfriamiento de 1 h por (métrica, tipo) y agrupación de consecutivas en eventos (§9).
 
-14. **American Heart Association (AHA)**
-    Guías de rangos normales para presión arterial
-    https://www.heart.org/
+### 16.3 Filtrado temporal con rango de horas a través de días
 
-15. **Organización Mundial de la Salud (OMS)**
-    Guías de monitoreo de adultos mayores
-    https://www.who.int/
+Filtrar fecha y hora por separado deja "huecos" al cruzar la medianoche. **Solución:** combinar fecha + hora en un único `datetime` *tz-aware* y filtrar por un solo intervalo (`get_filtered_data`).
 
-16. **ISO 13485**
-    Sistemas de gestión de calidad para dispositivos médicos
-    (Referencia para trabajo futuro)
+### 16.4 Análisis sobre datos históricos
 
-### 14.7 Contactos del Proyecto
+Anclar la ventana de tendencia a `now()` descartaría datos válidos (los datos no llegan hasta hoy). **Solución:** anclar a la última fecha de datos de cada paciente (§10.3).
 
-**Estudiante**
-Rocío Pesoa
-rocio.pesoa@itba.edu.ar
-Instituto Tecnológico de Buenos Aires (ITBA)
+### 16.5 Costo del análisis sobre 2,3 M de filas
 
-**Tutor Principal**
-Dr. Miguel Aguirre
-maguirre@itba.edu.ar
-ITBA
+Filtrar por (paciente, métrica) repetidamente era O(pacientes × métricas) recorridos del DataFrame (~17,7 s). **Solución:** un único `groupby` por métrica (~1,8 s) + caché (§10.4).
 
-**Co-tutora**
-Ing. Melisa Granda
-melisa.granda@uah.es
-Universidad de Alcalá
+### 16.6 Generación de PDF en entorno headless
 
-**Colaboradora**
-Giuliana Espósito
-gesposito@itba.edu.ar
-ITBA
+Sin display ni dependencias de sistema pesadas. **Solución:** matplotlib backend "Agg" + fpdf2 pura-Python + fuente DejaVuSans para Unicode; import perezoso para no cargar matplotlib al arranque (§12).
 
-**Institución Participante**
-Residencia Asturiana de Buenos Aires
-contacto@residenciaasturiana.org.ar
+### 16.7 Acceso seguro desde fuera de la institución
+
+Exponer un dashboard con datos de salud sin infraestructura propia. **Solución:** Tailscale (VPN) + Funnel (HTTPS) + login de la app, sobre datos anonimizados (§15.4).
+
+---
+
+## 17. RESULTADOS Y ESTADO ACTUAL
+
+### 17.1 Funcionalidades completadas
+
+| Área | Estado | Detalle |
+|------|--------|---------|
+| Pipeline SQL→JSON→Parquet | ✅ | Reproducible en un comando |
+| Carga eficiente en la Pi | ✅ | 2,36 M filas, ~280 MB RAM |
+| Dashboard de cohorte | ✅ | Alertas + tabla resumen |
+| Monitor por paciente | ✅ | Filtros, overlay/subplots, estadísticas |
+| Detección de alarmas | ✅ | Umbral + cooldown 1 h |
+| Agrupación de eventos | ✅ | Consecutivas ≤ 1,5× cooldown |
+| Historial navegable | ✅ | Modal + "Ver" → gráfico del evento |
+| Línea base personalizada | ✅ | Banda circadiana p10–p90 |
+| Tendencias semanales | ✅ | Pendiente + detección adversa |
+| Informes PDF/CSV | ✅ | Por paciente y de cohorte |
+| Autenticación | ✅ | Login Flask + CLI de usuarios |
+| Despliegue en producción | ✅ | systemd + gunicorn en Pi |
+| Acceso remoto seguro | ✅ | Tailscale + Funnel (HTTPS) |
+| Manejo de zona horaria | ✅ | UTC → Argentina |
+| Detección de gaps | ✅ | Rompe líneas con NaN |
+
+### 17.2 Métricas del proyecto (verificadas)
+
+- **Pacientes:** 26 registros en `patients`, **22 con datos** de wearable.
+- **Mediciones:** **2.363.501** registros (`wearabledata`).
+- **Métricas:** 6 tipos (distribución en §8.2).
+- **Datos:** ~520 MB (JSON) → ~10 MB (Parquet wearable) + ~7,6 KB (Parquet pacientes).
+- **Performance del análisis:** ~1,8 s (overview optimizado) frente a ~17,7 s (versión ingenua).
+
+### 17.3 Capturas de pantalla
+
+*(Espacios reservados para incluir capturas en la versión final de la tesis: Dashboard con panel de alertas y tabla; Monitor con gráfico superpuesto; sección "Tendencias y patrones" con banda personal y tendencias; modal de historial; ejemplo de PDF generado; pantalla de login.)*
+
+---
+
+## 18. TRABAJO FUTURO
+
+- **Validación clínica de umbrales:** reemplazar los *defaults* por valores validados por el equipo médico (rangos normales, plausibilidad, pendientes de tendencia).
+- **Datos clínicos reales:** integrar `clinicalevents` y `labresults` (hoy vacías) para correlacionar eventos con cambios fisiológicos; superponerlos como anotaciones en los gráficos.
+- **Estado autopercibido:** explotar `perceivedhealthdata` (122 registros disponibles).
+- **Unificar umbral de gaps:** leer el umbral desde `CFG` (hoy hardcodeado en 30 min; ver §11.3).
+- **Roles de usuario:** distinguir médico / enfermero / admin.
+- **Logging y auditoría** de accesos y consultas.
+- **Detección de anomalías (ML):** sobre la base ya establecida de línea base y tendencias.
+- **Evaluación de usabilidad** formal con el equipo médico (tareas, tiempos, errores, encuestas Likert).
+- **Escalabilidad multi-institución:** parametrización por centro y guía de instalación replicable.
+
+---
+
+## 19. CONCLUSIONES
+
+VITAICARE evolucionó de un visualizador de series temporales a una **plataforma de monitoreo completa, desplegada y accesible de forma segura** sobre hardware de bajo costo. Los principales logros técnicos son:
+
+1. Un **pipeline de datos reproducible** que hace viable trabajar con 2,36 M de registros en una Raspberry Pi de 2 GB (de ~520 MB a ~10 MB; de OOM a ~280 MB de RAM).
+2. Un **sistema de alarmas** con enfriamiento y agrupación que produce información clínica legible en lugar de ruido.
+3. Un **módulo de análisis** que mira el patrón propio de cada paciente (línea base circadiana) y detecta deterioro sostenido (tendencias), correctamente anclado a datos históricos.
+4. **Informes clínicos exportables** y **autenticación** funcionando en un entorno *headless*.
+5. Un **despliegue real** (systemd + gunicorn) con acceso remoto cifrado (Tailscale + Funnel) sobre datos anonimizados.
+
+Aprendizajes clave: la importancia de las decisiones de ingeniería motivadas por restricciones reales (memoria de la Pi), la diferencia entre umbrales genéricos y patrones personalizados para la relevancia clínica, y la necesidad de que todos los umbrales sean parametrizables a la espera de validación médica. La base de código está modularizada, cacheada por rendimiento y versionada con Git, lista para evolución.
+
+---
+
+## 20. REFERENCIAS Y RECURSOS
+
+### 20.1 Bibliografía técnica
+
+1. **Dash Documentation** — Plotly Technologies Inc. — https://dash.plotly.com/
+2. **Plotly Python Graphing Library** — https://plotly.com/python/
+3. **Pandas Documentation** — https://pandas.pydata.org/docs/
+4. **Apache Parquet / PyArrow** — https://arrow.apache.org/docs/python/
+5. **Bootswatch DARKLY** — https://bootswatch.com/darkly/
+6. **Tailscale (WireGuard mesh VPN) / Tailscale Funnel** — https://tailscale.com/
+7. **Raspberry Pi Connect** — https://www.raspberrypi.com/software/connect/
+
+### 20.2 Bibliografía clínica
+
+8. **Manual del reloj ID Vita** — Intelligent Data.
+9. **Clark, M. (2023)** — "Single-Use Wearable Wireless Sensors for Vital Sign Monitoring", *Canadian Journal of Health Technologies*.
+10. **Moore, K. et al. (2021)** — "Older Adults' Experiences With Using Wearable Devices", *JMIR mHealth and uHealth*.
+11. **Khairat, S. S. et al. (2018)** — "The Impact of Visualization Dashboards on Quality of Care", *JMIR Human Factors*.
+12. **Dowding, D. et al. (2019)** — "Usability Evaluation of a Dashboard for Home Care Nurses", *CIN: Computers, Informatics, Nursing*.
+
+### 20.3 Recursos del proyecto
+
+- **CLAUDE.md** — contexto y directrices de desarrollo.
+- **README_RASPBERRY.md** — guía de despliegue en Raspberry Pi.
+- **Anteproyecto VITAICARE** — Pesoa, R. (2024).
+
+### 20.4 Contactos
+
+- **Estudiante:** Rocío Pesoa — ITBA (Bioingeniería).
+- **Tutor:** Dr. Miguel Aguirre — ITBA.
+- **Co-tutora:** Ing. Melisa Granda — Universidad de Alcalá.
+- **Colaboradora:** Giuliana Espósito — ITBA.
+- **Institución participante:** Residencia Asturiana de Buenos Aires.
 
 ---
 
 ## ANEXOS
 
-### Anexo A: Instalación y Ejecución
+### Anexo A — Instalación y ejecución
 
-**Requisitos del sistema**:
-- Python 3.10+
-- 4 GB RAM mínimo
-- 500 MB espacio en disco
-- Navegador moderno (Chrome, Firefox, Edge)
-
-**Instalación**:
+#### A.1 Desarrollo (en la PC)
 
 ```bash
-# 1. Clonar repositorio
-git clone [URL_del_repositorio]
+git clone <URL_del_repositorio>
 cd newpacientes
-
-# 2. Crear entorno virtual
 python -m venv .venv
-
-# 3. Activar entorno
 # Windows:
 .venv\Scripts\activate
 # Linux/Mac:
 source .venv/bin/activate
+pip install --upgrade pip
+pip install -r requirements.txt
 
-# 4. Instalar dependencias
-pip install dash dash-bootstrap-components plotly pandas
+# Generar los Parquet a partir de RA.json (requiere RA.json presente):
+python convert_to_parquet.py     # genera RA_patients.parquet y RA_wearable.parquet
 
-# 5. Verificar que RA.json existe
-ls RA.json  # Debe existir y pesar ~109 MB
-
-# 6. Ejecutar aplicación
-python app.py
-
-# 7. Abrir en navegador
-# http://localhost:8050
+# Ejecutar (toma los Parquet si existen; si no, RA.json):
+python app.py                    # http://localhost:8050
 ```
 
-**Solución de problemas comunes**:
+Si se parte del volcado SQL: `python parse_mysql_dump.py RA.sql` para generar `RA.json`, y luego `convert_to_parquet.py`.
 
-```
-Problema: ModuleNotFoundError: No module named 'dash'
-Solución: pip install dash
+Crear un usuario para poder iniciar sesión:
 
-Problema: FileNotFoundError: RA.json not found
-Solución: Asegurar que RA.json está en directorio raíz
-
-Problema: Puerto 8050 en uso
-Solución: Cambiar puerto en app.py: app.run(port=8051)
+```bash
+python gestionar_usuarios.py add <usuario>   # pide la contraseña (oculta)
+python gestionar_usuarios.py list
+python gestionar_usuarios.py delete <usuario>
 ```
 
-### Anexo B: Estructura Completa de Archivos
+#### A.2 Despliegue en la Raspberry Pi
+
+Flujo completo desde Windows (PowerShell), tras reemplazar `RA.sql` por un dump nuevo:
+
+```powershell
+.\deploy\actualizar-datos.ps1        # SQL→JSON→Parquet→deploy→restart
+# o, para sólo desplegar código + Parquet ya generados:
+.\deploy\deploy.ps1 -Address 100.99.247.65 -User ro
+```
+
+En la Pi (primera vez): crear `.venv`, `pip install -r requirements.txt`, instalar el servicio systemd (`deploy/vitaicare.service`) y crear usuarios por SSH. Detalle completo en `README_RASPBERRY.md`.
+
+#### A.3 Variables de entorno
+
+| Variable | Default | Descripción |
+|----------|---------|-------------|
+| `HOST` | `0.0.0.0` | Interfaz de escucha |
+| `PORT` | `8050` | Puerto del servidor |
+| `DEBUG` | `false` | Modo debug de Dash |
+| `VITAICARE_PATIENTS_PARQUET` | `RA_patients.parquet` | Parquet de pacientes |
+| `VITAICARE_WEARABLE_PARQUET` | `RA_wearable.parquet` | Parquet de serie temporal |
+| `VITAICARE_JSON` | `RA.json` | JSON de respaldo |
+| `VITAICARE_USERS` | `users.json` | Usuarios (hashes) |
+| `VITAICARE_SECRET` | `.flask_secret` | Secret key de sesiones |
+
+### Anexo B — Estructura de archivos (actual)
 
 ```
 newpacientes/
+├── app.py                          # Entrada: precarga datos, init_auth, server=app.server
+├── parse_mysql_dump.py             # Etapa 1 del pipeline: RA.sql -> RA.json (streaming)
+├── convert_to_parquet.py           # Etapa 2 del pipeline: RA.json -> Parquet
+├── gestionar_usuarios.py           # CLI de gestión de usuarios (add/list/delete)
+├── requirements.txt                # Dependencias fijadas (wheels aarch64)
 │
-├── app.py                          # Aplicación principal Dash
-├── RA.json                         # Dataset principal (109 MB)
-├── RA.sql                          # SQL dump original (103 MB)
+├── src/
+│   ├── config.py                   # METRICS, Alarm/AlertType, CFG, ACFG, umbrales
+│   ├── data_loader.py              # Carga (Parquet/JSON), filtrado, gaps, ALARMAS
+│   ├── analytics.py                # Línea base personal + tendencias semanales
+│   ├── reports.py                  # Informes PDF/CSV (matplotlib Agg + fpdf2)
+│   ├── auth.py                     # Login Flask, sesiones, guard de rutas
+│   │
+│   └── dash_app/
+│       ├── layout.py               # Navbar, routing, dcc.Store de sesión
+│       ├── callbacks.py            # Toda la lógica reactiva
+│       ├── figures.py              # Figuras Plotly (monitor + análisis)
+│       └── pages/
+│           ├── dashboard.py        # Cohorte: alertas, tabla, modal historial
+│           └── patient_monitor.py  # Individual: filtros, gráfico, análisis
+│
+├── assets/
+│   └── custom.css                  # Estilos dark, calendarios, dropdowns
+│
+├── deploy/
+│   ├── deploy.ps1                  # Deploy a la Pi (rsync/WSL/tar+scp)
+│   ├── actualizar-datos.ps1        # Ciclo completo de datos + deploy + restart
+│   └── vitaicare.service           # Unidad systemd (gunicorn, 1 worker)
+│
+├── README_RASPBERRY.md             # Guía de despliegue
 ├── CLAUDE.md                       # Contexto del proyecto
-├── DISENO_GUI.md                   # Diseño UI/UX
 ├── INFORME_TECNICO.md              # Este informe
-├── design.md                       # Notas de diseño
-├── questions.md                    # Preguntas de desarrollo
-├── Anteproyecto_PESOA__PROYECTO_VITAICARE_corregido.pdf
 │
-├── src/                            # Código fuente
-│   ├── __init__.py
-│   ├── config.py                   # Configuración (DB, métricas, IMEI)
-│   ├── data_loader.py              # Carga y filtrado de datos
-│   ├── io.py                       # Utilidades I/O (legacy)
-│   │
-│   ├── __pycache__/                # Archivos compilados Python
-│   │   ├── config.cpython-314.pyc
-│   │   └── data_loader.cpython-314.pyc
-│   │
-│   └── dash_app/                   # Módulo Dash
-│       ├── __init__.py
-│       ├── layout.py               # Definición de UI
-│       ├── callbacks.py            # Lógica interactiva
-│       ├── figures.py              # Generación de gráficos
-│       │
-│       └── __pycache__/            # Archivos compilados
-│           ├── layout.cpython-314.pyc
-│           ├── callbacks.cpython-314.pyc
-│           └── figures.cpython-314.pyc
-│
-├── assets/                         # Recursos estáticos
-│   └── custom.css                  # Estilos personalizados
-│
-├── .venv/                          # Entorno virtual Python
-│   ├── Lib/                        # Librerías instaladas
-│   ├── Scripts/                    # Scripts de activación
-│   └── pyvenv.cfg                  # Configuración del entorno
-│
-├── .vscode/                        # Configuración VSCode
-│   └── extensions.json             # Extensión Claude Code recomendada
-│
-├── .git/                           # Repositorio Git
-│   ├── hooks/
-│   ├── objects/
-│   ├── refs/
-│   └── config
-│
-└── .gitignore                      # Archivos ignorados por Git
+├── RA_patients.parquet             # Datos procesados (~7,6 KB)   [gitignored]
+├── RA_wearable.parquet             # Datos procesados (~10 MB)    [gitignored]
+├── RA.json                         # Respaldo (~520 MB, solo dev) [gitignored]
+├── RA.sql                          # Volcado original (~495–519 MB) [gitignored]
+├── users.json                      # Usuarios (hashes)  [gitignored, 600]
+└── .flask_secret                   # Secret key  [gitignored, 600]
 ```
 
-**Tamaños de archivos clave**:
-- RA.json: 109 MB
-- RA.sql: 103 MB
-- CLAUDE.md: 22 KB
-- DISENO_GUI.md: 23 KB
-- INFORME_TECNICO.md: ~50 KB
-- Total proyecto: ~220 MB
-
-### Anexo C: Comandos Git Útiles
-
-```bash
-# Ver historial de commits
-git log --oneline
-
-# Ver cambios recientes
-git diff
-
-# Ver estado actual
-git status
-
-# Crear nueva rama para feature
-git checkout -b feature/alertas
-
-# Agregar cambios
-git add .
-
-# Commit con mensaje
-git commit -m "Implementar sistema de alertas"
-
-# Push a remoto
-git push origin main
-```
-
-### Anexo D: Configuración de Métricas (Extracto de config.py)
+### Anexo C — Extracto de configuración de métricas (`config.py`)
 
 ```python
 METRICS = {
-    "heart_rate": {
-        "name": "Frecuencia Cardíaca",
-        "color": "#FF6B6B",
-        "unit": "BPM",
-        "normal_min": 60,
-        "normal_max": 100
-    },
-    "blood_oxygen_saturation": {
-        "name": "Saturación de Oxígeno",
-        "color": "#4ECDC4",
-        "unit": "%",
-        "normal_min": 95,
-        "normal_max": 100
-    },
-    "systolic_blood_pressure": {
-        "name": "Presión Arterial Sistólica",
-        "color": "#95E1D3",
-        "unit": "mmHg",
-        "normal_min": 90,
-        "normal_max": 140
-    },
-    "diastolic_blood_pressure": {
-        "name": "Presión Arterial Diastólica",
-        "color": "#F38181",
-        "unit": "mmHg",
-        "normal_min": 60,
-        "normal_max": 90
-    },
-    "temperature": {
-        "name": "Temperatura Corporal",
-        "color": "#AA96DA",
-        "unit": "°C",
-        "normal_min": 36.0,
-        "normal_max": 37.5
-    },
-    "daily_activity_steps": {
-        "name": "Actividad Diaria (Pasos)",
-        "color": "#FCBAD3",
-        "unit": "pasos",
-        "normal_min": None,
-        "normal_max": None
-    }
+    "heart_rate":              {"name": "Frecuencia Cardíaca", "color": "#E06464",
+                                "unit": "bpm",  "normal_min": 50,   "normal_max": 120},
+    "blood_oxygen_saturation": {"name": "Saturación O2",       "color": "#A268BA",
+                                "unit": "%",    "normal_min": 80,   "normal_max": 100},
+    "systolic_blood_pressure": {"name": "Presión Sistólica",   "color": "#68c2f6",
+                                "unit": "mmHg", "normal_min": 90,   "normal_max": 140},
+    "diastolic_blood_pressure":{"name": "Presión Diastólica",  "color": "#8eb69b",
+                                "unit": "mmHg", "normal_min": 60,   "normal_max": 90},
+    "temperature":             {"name": "Temperatura",         "color": "#FFEAA7",
+                                "unit": "°C",   "normal_min": 25.0, "normal_max": 38.0},
+    "daily_activity_steps":    {"name": "Pasos Diarios",       "color": "#DDA0DD",
+                                "unit": "pasos","normal_min": 0,    "normal_max": None},
 }
 ```
+
+### Anexo D — Resumen de discrepancias entre la documentación y el código
+
+Verificadas contra el código fuente (en caso de divergencia, prevalece el código):
+
+1. **Umbral de gaps:** documentado como 15 min, pero `get_filtered_data` usa `GAP_THRESHOLD_MINUTES = 30`. Además `CFG.gap_threshold_minutes = 5` no se usa en la detección de gaps de los gráficos.
+2. **IP por defecto de `actualizar-datos.ps1`:** la cabecera del script menciona `192.168.1.88`, pero el default real del parámetro `-Address` es la IP de Tailscale `100.99.247.65`.
+3. **Tamaños de archivo en disco (verificados):** `RA.sql` ≈ 519 MB, `RA.json` ≈ 520 MB, `RA_wearable.parquet` ≈ 10 MB, `RA_patients.parquet` ≈ 7,6 KB (la consigna estimaba ~495 MB / ~444 MB / ~8,5 MB respectivamente; la diferencia se debe al volcado vigente).
+4. **Conteos verificados:** `patients` = 26 filas, `wearabledata` = 2.363.501 filas, 22 IMEIs con datos; coinciden con la consigna.
 
 ---
 
 **FIN DEL INFORME TÉCNICO**
 
----
-
-**Documento preparado por**: Rocío Pesoa
-**Para**: Entrega académica - ITBA
-**Fecha**: Enero 2026
-**Versión**: 1.0
-**Páginas**: [Este documento contiene aproximadamente 50 páginas de contenido técnico]
-
----
-
-*Este informe técnico documenta el desarrollo completo del proyecto VITAICARE - módulo newpacientes, incluyendo arquitectura, tecnologías, implementación, desafíos y resultados. Para consultas técnicas adicionales o acceso al código fuente, contactar a rocio.pesoa@itba.edu.ar*
+*Documento preparado por Rocío Pesoa para entrega académica — ITBA. Versión 2.0, 24 de junio de 2026. Documenta el estado actual del proyecto VITAICARE (módulo newpacientes): pipeline de datos, alarmas, análisis, informes, autenticación y despliegue en Raspberry Pi.*
