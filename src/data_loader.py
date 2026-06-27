@@ -206,15 +206,20 @@ def get_patients_summary() -> list[dict]:
     """
     patients_df, wearable_df = load_all_data()
 
-    now = pd.Timestamp.now(tz="America/Argentina/Buenos_Aires")
-    week_ago = now - pd.Timedelta(days=7)
-
-    # Alarma "sin datos": referencia = dato más reciente del sistema (no now(),
-    # porque los datos son históricos). Un paciente cuyo último registro quedó
-    # más de CFG.no_data_hours por detrás del dato más fresco del sistema => su
-    # reloj dejó de transmitir.
+    # Ventana de revisión del dashboard: SOLO la última semana. Como los datos
+    # son históricos (no llegan hasta hoy), la semana se ancla al dato más
+    # reciente del sistema y NO a now(): así un dump viejo no marca a toda la
+    # cohorte como "sin datos". Todo el resumen (valores y alarmas) se calcula
+    # sobre esta ventana.
     latest_overall = wearable_df["record_datetime"].max()
-    last_by_imei = wearable_df.groupby("imei")["record_datetime"].max()
+    week_ago = latest_overall - pd.Timedelta(days=7)
+    recent_df = wearable_df[wearable_df["record_datetime"] >= week_ago]
+
+    # Alarma "sin datos": dentro de esa última semana, referencia = dato más
+    # reciente del sistema. Un paciente cuyo último registro de la semana quedó
+    # más de CFG.no_data_hours por detrás de esa referencia —o que no tiene
+    # ningún registro en la última semana— => su reloj dejó de transmitir.
+    last_by_imei = recent_df.groupby("imei")["record_datetime"].max()
     no_data_cutoff = pd.Timedelta(hours=CFG.no_data_hours)
 
     summary: list[dict] = []
@@ -227,16 +232,13 @@ def get_patients_summary() -> list[dict]:
         if last_seen is None or pd.isna(last_seen):
             last_seen = None
             hours_since_last = None
-            no_data_alert = True  # nunca transmitió
+            no_data_alert = True  # sin registros en la última semana
         else:
             gap = latest_overall - last_seen
             hours_since_last = gap.total_seconds() / 3600.0
             no_data_alert = gap > no_data_cutoff
 
-        patient_data = wearable_df[
-            (wearable_df["imei"] == imei) &
-            (wearable_df["record_datetime"] >= week_ago)
-        ]
+        patient_data = recent_df[recent_df["imei"] == imei]
 
         # Detect alarms via single source of truth
         alarms = _detect_alarms(patient_id, patient_data)

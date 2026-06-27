@@ -71,8 +71,10 @@ def create_patient_row(patient: dict) -> html.Tr:
     # Alert indicator
     alert_count = len(patient["alerts"])
     if patient.get("no_data_alert"):
+        gap_h = patient.get("hours_since_last")
+        label = "Sin datos en la semana" if gap_h is None else f"Sin datos (hace {_fmt_gap(gap_h)})"
         status = html.Span(
-            f"Sin datos ({_fmt_gap(patient.get('hours_since_last'))})",
+            label,
             className="badge text-white", style={"backgroundColor": "#8a8a8a"}
         )
     elif alert_count > 0:

@@ -1,0 +1,218 @@
+
+\documentclass[12pt,a4paper]{article}
+
+% =====================================================================
+%  VITAICARE — wrapper de compilación
+%  El CUERPO se escribe en tesis.md y se genera con  bash build.sh
+%  -> produce cuerpo.tex, que este archivo incluye con \input.
+%  Este archivo conserva el preámbulo y la portada de main.tex;
+%  la única diferencia es la bibliografía: biblatex (IEEE) en vez de ieeetr.
+% =====================================================================
+
+% ---------- Idioma y codificación ----------
+\usepackage[spanish, es-tabla]{babel}
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}   % (pdflatex)
+\usepackage{lmodern}
+\usepackage{microtype}
+
+% ---------- Márgenes / espaciado ----------
+\usepackage{geometry}
+\geometry{left=2.5cm,right=2.5cm,top=2.5cm,bottom=3.5cm}
+\usepackage{setspace}
+\onehalfspacing
+\parindent=5mm
+
+% ---------- Matemática ----------
+\usepackage{amsmath, amssymb, bm, mathrsfs}
+
+% ---------- Unidades ----------
+\usepackage{siunitx}
+\sisetup{detect-all}
+
+% ---------- Colores ----------
+\usepackage[dvipsanames]{xcolor}
+\definecolor{light-gray}{gray}{0.94}
+\definecolor{textgray}{gray}{0.5}
+\definecolor{myviolet}{RGB}{128,0,200}
+
+% ---------- Gráficos / Figuras ----------
+\usepackage{graphicx}
+\DeclareGraphicsExtensions{.pdf,.png,.jpg}
+\usepackage{float}        % para [H]
+\usepackage{subfigure}    % si preferís, cambiar por subcaption
+% \usepackage{subcaption} % alternativa moderna (si usás esta, sacá subfigure)
+
+% ---------- PDF insert ----------
+\usepackage{pdfpages}
+% ---------- Tablas ----------
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{tabularx}
+\usepackage{multirow}
+\usepackage{longtable}
+\usepackage{colortbl}
+\usepackage{adjustbox}
+
+% ---------- Listas ----------
+\usepackage{enumitem}
+\setlist[itemize]{leftmargin=1.2em}
+
+% ---------- Links ----------
+\usepackage[hidelinks]{hyperref}
+\hypersetup{
+  colorlinks=true,
+  linkcolor=blue,
+  urlcolor=blue,
+  citecolor=blue
+}
+
+% ---------- Encabezado/Pie ----------
+\usepackage{fancyhdr}
+\pagestyle{fancy}
+\fancyhf{}
+\lhead{Documento}
+\rhead{\leftmark}
+\cfoot{\thepage}
+
+% ---------- TikZ / PGFPlots ----------
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta,positioning,shapes.geometric}
+\usepackage{pgfplots}
+\pgfplotsset{compat=1.18}
+\usepackage{pgf}
+\usepackage{pgfgantt}   % cronogramas tipo Gantt
+
+% ---------- Utilidades varias ----------
+\usepackage{placeins}   % \FloatBarrier
+\usepackage{multicol}
+\usepackage{verbatim}
+
+% ---------- Código / Listings ----------
+\usepackage{listings}
+\lstset{
+  basicstyle=\ttfamily\small,
+  breaklines=true,
+  frame=single,
+  numbers=left,
+  numberstyle=\tiny,
+  keywordstyle=\color{blue},
+  commentstyle=\color{textgray},
+  stringstyle=\color{red!60!black}
+}
+
+% ---------- Entorno verbatim “lindo” (tu verbcode) ----------
+\usepackage{fancyvrb,fancybox,calc}
+\newenvironment{verbcode}{\VerbatimEnvironment
+  \begin{Sbox} \color{textgray}\scriptsize
+  \begin{minipage}{\linewidth+2\fboxsep-2\fboxrule-12pt}
+  \begin{Verbatim}
+}{\end{Verbatim}
+  \end{minipage}
+  \end{Sbox} \color{black}\normalsize
+  \fcolorbox{black}{light-gray}{\TheSbox}
+}
+
+% ---------- Comandos útiles ----------
+\newcommand{\HRule}{\rule{\linewidth}{0.5mm}}
+\newcommand{\rev}[1]{\textcolor{myviolet}{#1}} % o RoyalBlue
+
+% ---------- Bibliografía (biblatex IEEE, reemplaza a ieeetr) ----------
+\usepackage[backend=biber,style=ieee,sorting=none]{biblatex}
+\addbibresource{referencias.bib}
+
+\begin{document}
+
+% =======================
+% 1. PORTADA
+% =======================
+\begin{center}
+
+\textsc{\LARGE  Proyecto Final de Carrera }\\[0.2cm]
+\textsc{\Large Instituto Tecnológico de Buenos Aires}\\[0.5cm]
+
+\begin{figure}[H]
+\centering
+\includegraphics[scale=0.15]{logo itba.png}
+\end{figure}
+
+\FloatBarrier
+\end{center}
+\vspace{0.3cm}
+% Title
+
+\begin{center}
+\HRule \\[0.4cm]
+{ \large { \bfseries   Proyecto Final de Carrera \\[0.5cm]
+
+I\&D: Diseño e implementación de un prototipo de interfaz médica para la visualización de datos biométricos obtenidos mediante relojes inteligentes.\\
+[0.4cm] } }
+ \HRule \\[1cm]
+\end{center}
+
+
+% Author and supervisor
+{\raggedright{}
+\large
+\bf{Profesores:}
+\begin{center}
+    \begin{itemize}
+    \item \ \  Giuliana     \textsc{Esposito}\\
+    \item \ \  Gaston     \textsc{Corti}\\
+\end{itemize}
+
+\end{center}
+\vspace{0.5 cm}
+\bf{Tutor:}
+\begin{center}
+    \begin{itemize}
+    \item \ \  Miguel     \textsc{Aguirre}\\
+    \end{itemize}
+\end{center}
+\bf{Co-tutor:}
+\begin{center}
+    \begin{itemize}
+    \item \ \  Patricio     \textsc{Whittingslow}\\
+    \end{itemize}
+\end{center}
+\vspace{0.5 cm}
+\bf{Alumna:}
+\begin{center}
+    \begin{itemize}
+
+     \item  \ \ Rocío    \textsc{Pesoa}\\
+
+\end{itemize}
+\end{center}
+\vspace{0.5 cm}
+{\bf{Lugar y fecha de entrega:} 25-06-2026,   Buenos Aires, Argentina.}
+}
+
+
+\vfill
+\vspace{0.7cm}
+
+
+\pagestyle{fancy}
+\headheight=60pt 	%para cambiar el tamaño del encabezado
+\fancyhead[L]	{Proyecto Final De Carrera}
+\fancyhead[R] 	{ ITBA - 2026  }
+
+% =======================
+% ÍNDICE
+% =======================
+\tableofcontents
+\newpage
+
+% =======================
+% CUERPO  (generado por md2latex desde tesis.md)
+% =======================
+\input{cuerpo.tex}
+
+% =======================
+% BIBLIOGRAFÍA
+% =======================
+\newpage
+\printbibliography[title={Bibliografía}]
+
+\end{document}

@@ -52,7 +52,7 @@ Respecto de la versión inicial (un visualizador de series temporales con filtro
 - **Módulo de análisis** con línea base personalizada (banda circadiana p10–p90 por paciente) y tendencias semanales con detección de deterioro sostenido (alerta temprana).
 - **Generación de informes descargables** en PDF (con `fpdf2` + `matplotlib`) y CSV.
 - **Autenticación por usuario y contraseña** con sesiones de Flask y gestión de usuarios por CLI.
-- **Despliegue en producción**: `gunicorn` + `systemd` en una Raspberry Pi 4, con acceso remoto vía Tailscale (VPN) y exposición pública HTTPS mediante Tailscale Funnel con dominio propio.
+- **Despliegue en producción**: `gunicorn` + `systemd` en una Raspberry Pi 4, con acceso de administración vía Tailscale (VPN) y exposición pública HTTPS mediante un reverse proxy (Caddy) en una Raspberry Pi de borde separada, con dominio propio.
 
 ### Logros Principales (estado actual)
 
@@ -528,7 +528,7 @@ CLI con subcomandos `add` / `list` / `delete`; la contraseña se pide por `getpa
 
 ### 13.4 Postura de seguridad
 
-La protección efectiva es **el login de la aplicación + el cifrado HTTPS del túnel** (Tailscale Funnel; ver §15). Los datos están anonimizados conforme al protocolo del proyecto. La app sirve HTTP en la Pi; el cifrado lo aporta el túnel de borde.
+La protección efectiva es **el login de la aplicación + el cifrado HTTPS del borde** (un reverse proxy Caddy en una Raspberry Pi separada; ver §15). Los datos están anonimizados conforme al protocolo del proyecto. La app sirve HTTP plano en la Pi de la aplicación; la terminación TLS la hace el proxy de borde.
 
 ---
 
@@ -583,7 +583,7 @@ Restart=on-failure
 
 - **Un solo worker a propósito:** cada worker carga toda la serie en RAM; más de uno provocaría OOM en 2 GB.
 - 2 threads para concurrencia de E/S; timeout de 120 s para descargas/PDF pesados.
-- Sirve HTTP en el puerto 8050; el cifrado lo aporta el túnel de borde (§15.4).
+- Sirve HTTP plano en el puerto 8050; el cifrado lo aporta el proxy de borde (Caddy en una Pi separada, §15.4).
 - Se recomienda ampliar el *swap* a 2 GB en la Pi (documentado en `README_RASPBERRY.md`).
 
 ### 15.3 Despliegue desde Windows (PowerShell)
@@ -605,13 +605,20 @@ Restart=on-failure
 
 ### 15.4 Acceso remoto
 
-Tres mecanismos complementarios:
+Conviene distinguir el acceso de **administración** del de **exposición pública del dashboard**.
+
+**Administración (equipo técnico):**
 
 1. **rpi-connect** (Raspberry Pi Connect): terminal/escritorio remoto de la administradora vía `connect.raspberrypi.com`.
-2. **Tailscale** (VPN *mesh* sobre WireGuard): la Pi `pececito` y la laptop `msi` en la misma *tailnet* (IPs `100.x`) para acceso privado dentro y fuera de la institución, con IP estable.
-3. **Tailscale Funnel:** expone el dashboard públicamente con **HTTPS** en `https://pececito.tailda6dee.ts.net`, con un **dominio propio** `https://vitaicare.whittileaks.com` al frente.
+2. **Tailscale** (VPN *mesh* sobre WireGuard): la Pi de la aplicación (`pececito`) y la laptop de administración (`msi`) en la misma *tailnet* (IPs `100.x`), con IP estable. Es el canal usado para el despliegue por SSH (`deploy.ps1` apunta a `100.99.247.65`).
 
-La protección de extremo a extremo combina el **login de la app** con el **HTTPS del túnel**; los datos están anonimizados.
+**Exposición pública del dashboard (equipo médico):**
+
+3. **Reverse proxy de borde (Caddy):** una Raspberry Pi separada, dedicada al borde de la red, ejecuta **Caddy** como reverse proxy. Caddy publica el dominio propio **`https://vitaicare.whittileaks.com`** con **HTTPS** (gestión automática del certificado, comportamiento por defecto de Caddy) y **reenvía las peticiones a la Pi de la aplicación**, que sirve **HTTP plano** en el puerto 8050. La **terminación TLS ocurre en el borde**; la Pi de la aplicación nunca expone HTTPS por sí misma.
+
+La protección de extremo a extremo combina el **login de la app** con el **HTTPS que termina el proxy de borde (Caddy)**; los datos están anonimizados conforme al protocolo del proyecto.
+
+> Nota de infraestructura: el transporte interno entre la Pi de borde (Caddy) y la Pi de la aplicación (HTTP `:8050`) —red local o Tailscale— depende de la configuración del borde, a cargo del equipo de infraestructura.
 
 ---
 
@@ -643,7 +650,7 @@ Sin display ni dependencias de sistema pesadas. **Solución:** matplotlib backen
 
 ### 16.7 Acceso seguro desde fuera de la institución
 
-Exponer un dashboard con datos de salud sin infraestructura propia. **Solución:** Tailscale (VPN) + Funnel (HTTPS) + login de la app, sobre datos anonimizados (§15.4).
+Exponer un dashboard con datos de salud de forma cifrada. **Solución:** la app sirve HTTP plano y un reverse proxy **Caddy** en una Pi de borde separada termina HTTPS para el dominio propio; el acceso queda protegido por el login de la app, sobre datos anonimizados (§15.4). Tailscale (VPN) se usa para la administración/despliegue.
 
 ---
 
@@ -665,7 +672,7 @@ Exponer un dashboard con datos de salud sin infraestructura propia. **Solución:
 | Informes PDF/CSV | ✅ | Por paciente y de cohorte |
 | Autenticación | ✅ | Login Flask + CLI de usuarios |
 | Despliegue en producción | ✅ | systemd + gunicorn en Pi |
-| Acceso remoto seguro | ✅ | Tailscale + Funnel (HTTPS) |
+| Acceso remoto seguro | ✅ | Caddy (borde, HTTPS) + login; Tailscale para admin |
 | Manejo de zona horaria | ✅ | UTC → Argentina |
 | Detección de gaps | ✅ | Rompe líneas con NaN |
 
@@ -705,7 +712,7 @@ VITAICARE evolucionó de un visualizador de series temporales a una **plataforma
 2. Un **sistema de alarmas** con enfriamiento y agrupación que produce información clínica legible en lugar de ruido.
 3. Un **módulo de análisis** que mira el patrón propio de cada paciente (línea base circadiana) y detecta deterioro sostenido (tendencias), correctamente anclado a datos históricos.
 4. **Informes clínicos exportables** y **autenticación** funcionando en un entorno *headless*.
-5. Un **despliegue real** (systemd + gunicorn) con acceso remoto cifrado (Tailscale + Funnel) sobre datos anonimizados.
+5. Un **despliegue real** (systemd + gunicorn) con exposición pública cifrada por un reverse proxy Caddy en una Pi de borde, y administración por Tailscale, sobre datos anonimizados.
 
 Aprendizajes clave: la importancia de las decisiones de ingeniería motivadas por restricciones reales (memoria de la Pi), la diferencia entre umbrales genéricos y patrones personalizados para la relevancia clínica, y la necesidad de que todos los umbrales sean parametrizables a la espera de validación médica. La base de código está modularizada, cacheada por rendimiento y versionada con Git, lista para evolución.
 
@@ -720,8 +727,9 @@ Aprendizajes clave: la importancia de las decisiones de ingeniería motivadas po
 3. **Pandas Documentation** — https://pandas.pydata.org/docs/
 4. **Apache Parquet / PyArrow** — https://arrow.apache.org/docs/python/
 5. **Bootswatch DARKLY** — https://bootswatch.com/darkly/
-6. **Tailscale (WireGuard mesh VPN) / Tailscale Funnel** — https://tailscale.com/
-7. **Raspberry Pi Connect** — https://www.raspberrypi.com/software/connect/
+6. **Tailscale (WireGuard mesh VPN)** — https://tailscale.com/
+7. **Caddy (reverse proxy con HTTPS automático)** — https://caddyserver.com/
+8. **Raspberry Pi Connect** — https://www.raspberrypi.com/software/connect/
 
 ### 20.2 Bibliografía clínica
 
