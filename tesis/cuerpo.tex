@@ -12,7 +12,7 @@ No obstante, la captura de estos datos es solo el primer eslabón. Para que el e
 
 
 \subsection{Planteamiento del problema}
-En la Residencia Asturiana de Buenos Aires se monitoriza a un grupo de residentes mediante relojes inteligentes que registran sus datos biométricos. Estos registros se generan de forma continua y se almacenan en una base de datos, pero llegan al proyecto como un volcado crudo de esa base, exportado y enviado por el equipo de investigación en España. En ese formato, ninguna persona de la Residencia puede leerlos ni interpretarlos de manera directa: mientras esos registros no atraviesen una etapa de procesamiento que los ordene y los vuelva legibles, el equipo de salud no puede efectivamente ver ni utilizar la información. El dato existe, pero permanece inaccesible para quien debería usarlo en la práctica clínica cotidiana. A esto se suma que estos datos biométricos conviven de manera separada con la historia clínica y con otros registros de la práctica diaria, sin integrarse entre sí, lo que fragmenta aún más el panorama y dificulta su explotación sistemática.\\
+En la Residencia Asturiana de Buenos Aires se monitoriza a un grupo de residentes mediante relojes inteligentes que registran sus datos biométricos. Estos registros se generan de forma continua y se almacenan en una base de datos, pero llegan al proyecto como un volcado crudo de esa base, que la empresa proveedora de los relojes remite una vez por semana. En ese formato, ninguna persona de la Residencia puede leerlos ni interpretarlos de manera directa: mientras esos registros no atraviesen una etapa de procesamiento que los ordene y los vuelva legibles, el equipo de salud no puede efectivamente ver ni utilizar la información. El dato existe, pero permanece inaccesible para quien debería usarlo en la práctica clínica cotidiana. A esto se suma que estos datos biométricos conviven de manera separada con la historia clínica y con otros registros de la práctica diaria, sin integrarse entre sí, lo que fragmenta aún más el panorama y dificulta su explotación sistemática.\\
 
 La infraestructura para capturar y almacenar los datos ya existe; lo que falta es una interfaz pensada específicamente para el uso clínico, que le permita a médicos y personal de salud:\\
 
@@ -56,7 +56,7 @@ El presente documento se organiza en cuatro partes. La primera, de carácter con
 
 La segunda parte desarrolla el trabajo realizado: los materiales y métodos (Capítulo 5), que describen el dispositivo ID Vita, el conjunto de datos, el stack tecnológico, el relevamiento de requerimientos y las consideraciones éticas; y la implementación de la interfaz (Capítulo 6), con su arquitectura, sus vistas y su sistema de alertas.\\
 
-La tercera parte aborda la validación, mediante la evaluación de usabilidad (Capítulo 7) y la presentación de los resultados (Capítulo 8). Finalmente, la cuarta parte cierra el trabajo con la discusión (Capítulo 9) —donde se analizan los hallazgos y las limitaciones, en particular las vinculadas a la validez de las mediciones en la población geriátrica— y las conclusiones y el trabajo futuro (Capítulo 10). El documento se completa con la bibliografía y los anexos.\\
+La tercera parte aborda la validación, mediante la evaluación de usabilidad (Capítulo 7) y la presentación de los resultados (Capítulo 8). Finalmente, la cuarta parte cierra el trabajo con las conclusiones y el trabajo futuro (Capítulo 9), donde se interpretan los hallazgos y las limitaciones —en particular las vinculadas a la validez de las mediciones en la población geriátrica— y se trazan las líneas de continuidad. El documento se completa con la bibliografía y los anexos.\\
 
 
 \section{Objetivos}
@@ -151,7 +151,7 @@ La validación de los oxímetros de pulso está regulada por la norma ISO 80601-
 \subsubsection{Presión arterial}
 La presión arterial es el caso más delicado. Los tensiómetros automáticos tradicionales, que usan un manguito inflable, se validan según protocolos consolidados como la norma ISO 81060-2 para la medición intermitente \cite{iso81060_2} y la ISO 81060-3 para la medición continua \cite{iso81060_3}, en el marco del estándar universal AAMI/ESH/ISO \cite{stergiou2018}.\\
 
-El problema aparece con los dispositivos sin manguito (\textit{cuffless}), como los relojes inteligentes, que estiman la presión a partir de señales ópticas en lugar de medir directamente una presión. Para estos existe la norma IEEE 1708 \cite{ieee1708}, pero el campo permanece en discusión: los estándares pensados para equipos con manguito no fueron diseñados para dispositivos sin manguito, que entregan estimaciones indirectas y son sensibles a fluctuaciones de la señal no relacionadas con la presión real. El propio estándar universal reconoce que la validación de los dispositivos continuos, sin manguito y centrales requiere protocolos específicos, todavía en desarrollo \cite{stergiou2018}. En la práctica, esto significa que la presión arterial reportada por un reloj inteligente debe interpretarse con cautela. Esta consideración se retoma en la discusión (Capítulo 9), donde se vincula además con la observación de que los valores de presión del conjunto de datos resultaron sospechosos de ser sintéticos.\\
+El problema aparece con los dispositivos sin manguito (\textit{cuffless}), como los relojes inteligentes, que estiman la presión a partir de señales ópticas en lugar de medir directamente una presión. Para estos existe la norma IEEE 1708 \cite{ieee1708}, pero el campo permanece en discusión: los estándares pensados para equipos con manguito no fueron diseñados para dispositivos sin manguito, que entregan estimaciones indirectas y son sensibles a fluctuaciones de la señal no relacionadas con la presión real. El propio estándar universal reconoce que la validación de los dispositivos continuos, sin manguito y centrales requiere protocolos específicos, todavía en desarrollo \cite{stergiou2018}. En la práctica, esto significa que la presión arterial reportada por un reloj inteligente debe interpretarse con cautela. Esta consideración se retoma en las conclusiones (Capítulo 9), donde se vincula además con la observación de que los valores de presión del conjunto de datos resultaron sospechosos de ser sintéticos.\\
 
 
 \subsubsection{Implicancias para la población geriátrica}
@@ -202,8 +202,14 @@ La adquisición de los datos se realiza con el reloj inteligente \textbf{ID Vita
 Los fundamentos de la fotopletismografía y las particularidades de su uso en población geriátrica —especialmente las limitaciones de precisión que esto acarrea— se desarrollan en el marco teórico (Capítulo 3). Aquí basta con señalar que el ID Vita es la fuente primaria de todos los datos que la interfaz organiza y muestra.\\
 
 
+\begin{figure}[h]
+\centering
+\includegraphics[width=0.8\textwidth]{./fotos/entrega_relojes.jpeg}
+\caption{Entrega de los relojes ID Vita en la Residencia Asturiana, durante el primer día de la implementación, junto al equipo del proyecto y la médica responsable.}
+\end{figure}
+
 \subsection{El conjunto de datos}
-La información proviene de un volcado (\textit{dump}) de la base de datos MySQL/MariaDB de la Residencia Asturiana, generado con \texttt{mysqldump} y de un tamaño cercano a los 500 MB. Sobre ese volcado se trabajó de forma reproducible (el procesamiento se detalla en el Capítulo 6).\\
+La información la provee la empresa proveedora de los relojes (Intelligent Data), que remite los datos de los residentes una vez por semana. Llegan como un volcado (\textit{dump}) de una base de datos MySQL/MariaDB, generado con \texttt{mysqldump} y de un tamaño cercano a los 500 MB. Sobre ese volcado se trabajó de forma reproducible (el procesamiento se detalla en el Capítulo 6).\\
 
 El volcado contiene varias tablas, aunque solo dos concentran la información efectivamente utilizada. La Tabla 1 resume su contenido.\\
 
@@ -222,7 +228,7 @@ Tabla & Filas & Observación \\
 \texttt{sessionresults} & 0 & vacía en el volcado \\
 \hline
 \end{tabular}
-\caption{Tablas presentes en el volcado de la Residencia Asturiana.}
+\caption{Tablas presentes en el volcado de datos recibido.}
 \end{table}
 El grueso del trabajo recae sobre \texttt{wearabledata}: más de 2,36 millones de registros que conforman las series temporales de seis métricas. La Tabla 2 muestra su distribución. Las cinco variables fisiológicas tienen una cobertura muy pareja (cercana a los 468.000 registros cada una), mientras que los pasos diarios aparecen con una frecuencia mucho menor.\\
 
@@ -243,7 +249,7 @@ Pasos diarios & 20.561 \\
 \end{tabular}
 \caption{Distribución de registros de \texttt{wearabledata} por métrica.}
 \end{table}
-En conjunto, el volcado abarca registros desde 2023 hasta mediados de 2026, con aproximadamente seis meses de datos densos por paciente y el muestreo de cinco minutos ya mencionado. De cada registro se conserva únicamente lo necesario para la visualización y el análisis: el identificador del dispositivo, la métrica, la marca temporal y el valor.\\
+Los relojes se entregaron en la Residencia en diciembre de 2025, de modo que el período de monitorización relevante para este trabajo abarca desde esa fecha hasta mediados de 2026: unos seis meses de datos densos por paciente, con el muestreo de cinco minutos ya mencionado. El volcado contiene además registros anteriores —que se remontan hasta 2023—, ajenos a la monitorización del proyecto y sin relevancia para este trabajo. De cada registro se conserva únicamente lo necesario para la visualización y el análisis: el identificador del dispositivo, la métrica, la marca temporal y el valor.\\
 
 
 \subsubsection{Limitaciones de los datos}
@@ -251,11 +257,11 @@ Trabajar con datos reales implica reconocer sus imperfecciones, y varias de ella
 
 
 \begin{itemize}
-\item~ \textbf{Comorbilidades sin cargar.} Los campos de índice de Charlson, índice de Barthel y fecha de diálisis están vacíos, y el de diabetes figura en cero para todos los pacientes. No fue posible, por lo tanto, estratificar el análisis por comorbilidad.
+\item~ \textbf{Comorbilidades aún no cargadas.} Los campos de índice de Charlson, índice de Barthel y fecha de diálisis no se encuentran completados en los registros, y el de diabetes figura en cero para todos los pacientes; su carga corresponde al equipo clínico y queda pendiente. Por ese motivo no fue posible, por el momento, estratificar el análisis por comorbilidad, aunque su incorporación a futuro lo habilitaría.
 \item~ \textbf{Presión arterial sospechosa.} Los valores de presión llegan desde el propio volcado ya confinados a un rango fijo y estrecho —la sistólica entre 90 y 139 mmHg, la diastólica entre 60 y 89 mmHg—, sin las excursiones que sí muestran las demás variables: la frecuencia cardíaca, por ejemplo, abarca de 42 a 151 bpm sobre los mismos datos. Esta acotación no la introduce la aplicación, sino que viene en el dump de la base, lo que sugiere que se trata de datos sintéticos. Por esa razón, la presión se visualiza pero se excluye del módulo de análisis de patrones.
 \item~ \textbf{Pasos sin garantía de exactitud.} El fabricante no garantiza la precisión del conteo de pasos, por lo que también se excluyen del análisis, aunque pueden visualizarse.
 \end{itemize}
-Estas limitaciones se retoman en la discusión (Capítulo 9), donde pesan sobre la interpretación clínica de los resultados.\\
+Estas limitaciones se retoman en las conclusiones (Capítulo 9), donde pesan sobre la interpretación clínica de los resultados.\\
 
 
 \subsection{Herramientas de desarrollo}
@@ -302,7 +308,7 @@ Este relevamiento inicial permitió, además, identificar las tareas de revisió
 
 
 \subsection{Metodología de desarrollo}
-El desarrollo siguió un enfoque iterativo y centrado en el usuario, con ciclos sucesivos de diseño, prueba y ajuste. Cada avance se contrastó con la mirada del equipo médico, incorporando su retroalimentación antes de seguir construyendo. Este ida y vuelta explica por qué la herramienta creció bastante más allá de su versión inicial: lo que empezó como un visualizador de series temporales con filtros fue sumando, a pedido y por necesidad, un sistema de alarmas, un módulo de análisis y la posibilidad de exportar informes.\\
+El desarrollo siguió un enfoque iterativo y centrado en el usuario, con ciclos sucesivos de diseño, prueba y ajuste. Cada avance se contrastó con la mirada del equipo médico, incorporando su retroalimentación antes de seguir construyendo. Este ida y vuelta explica por qué la herramienta creció bastante más allá de su versión inicial: lo que empezó como un visualizador de series temporales con filtros fue sumando, a pedido y por necesidad, un sistema de alarmas, un módulo de análisis y la posibilidad de exportar informes. Todas las iteraciones del desarrollo se versionaron en un repositorio privado de GitHub, lo que permitió conservar el historial completo de los cambios y recuperar versiones anteriores cuando fue necesario.\\
 
 La validación final de la usabilidad con el equipo de salud —mediante tareas representativas, registro de tiempos y errores, y una encuesta estandarizada— constituye una etapa metodológica propia y se detalla en el Capítulo 7.\\
 
@@ -318,7 +324,7 @@ Este capítulo describe cómo se construyó VITAICARE: desde la arquitectura gen
 \subsection{Arquitectura general}
 El sistema se organiza en tres capas. La \textbf{capa de presentación}, construida con Dash y \textit{dash-bootstrap-components} sobre un tema oscuro, contiene las dos vistas principales —el \textit{dashboard} de cohorte y el monitor por paciente— y un \textit{login} que intercepta toda petición sin sesión válida. La \textbf{capa de lógica o de dominio} concentra el procesamiento: la carga y el filtrado de datos, la detección de alarmas, el análisis de patrones, la generación de informes y la autenticación, con un cacheo en memoria de todas las operaciones costosas. Por debajo, la \textbf{capa de datos} provee las series ya procesadas en formato Parquet.\\
 
-El flujo completo, de extremo a extremo, parte del reloj ID Vita —que mide cada cinco minutos— y termina en la pantalla del equipo médico. Entre ambos extremos, los datos pasan de la base MySQL de la Residencia a un volcado SQL, de allí a un formato intermedio y finalmente a dos archivos Parquet livianos que la aplicación lee. Un detalle deliberado de esta arquitectura es que el procesamiento pesado se ejecuta en la PC de desarrollo, donde sobra memoria, mientras que el equipo que sirve la aplicación solo lee los archivos ya procesados.\\
+El flujo completo, de extremo a extremo, parte del reloj ID Vita —que mide cada cinco minutos— y termina en la pantalla del equipo médico. Entre ambos extremos, los datos llegan como un volcado SQL de la base MySQL de la empresa proveedora de los relojes, pasan luego a un formato intermedio (JSON) y finalmente a dos archivos Parquet livianos que la aplicación lee. Un detalle deliberado de esta arquitectura es que el procesamiento pesado se ejecuta en la PC de desarrollo, donde sobra memoria, mientras que el equipo que sirve la aplicación solo lee los archivos ya procesados.\\
 
 
 \subsection{Pipeline de datos}
@@ -452,7 +458,7 @@ El reloj no siempre mide: hay períodos sin registros, ya sea porque el disposit
 
 
 \subsection{Informes descargables}
-El sistema permite exportar informes en PDF y en CSV, tanto por paciente como de toda la cohorte. El informe por paciente toma la selección activa del monitor e incluye los datos demográficos, una tabla de estadísticas, los eventos de alarma agrupados y, para cada evento (hasta un máximo de doce), un mini-gráfico de la métrica en una ventana que abarca desde dos horas antes hasta dos horas después del evento. El informe de cohorte resume a todos los pacientes con sus últimos valores y su estado, resaltando las filas en alerta.\\
+El sistema permite exportar informes en PDF y en CSV, tanto por paciente como de toda la cohorte. El informe por paciente toma la selección activa del monitor e incluye los datos demográficos, una tabla de estadísticas, los eventos de alarma agrupados y, para cada evento (hasta un máximo de doce), un mini-gráfico de la métrica en una ventana que abarca desde dos horas antes hasta dos horas después del evento. El informe de cohorte resume a todos los pacientes con sus últimos valores y su estado, resaltando las filas en alerta. A modo de ejemplo, se adjuntan ambos informes —uno de cohorte y uno por paciente— en el Anexo, al final del documento.\\
 
 La generación de estos informes tuvo que adaptarse a un entorno sin pantalla (\textit{headless}): se emplea un motor de gráficos que no requiere display y una librería de PDF escrita íntegramente en Python, evitando dependencias de sistema pesadas. Los archivos CSV se exportan con la marca de codificación adecuada para que los acentos se muestren correctamente al abrirlos en una planilla de cálculo.\\
 
@@ -462,11 +468,17 @@ El sistema corre sobre una Raspberry Pi 4 de 2 GB con un sistema operativo de 64
 
 La Raspberry Pi que aloja la aplicación se encuentra dentro de una red local y no recibe el tráfico externo de forma directa. El acceso público se resuelve mediante un \textbf{proxy inverso}: las solicitudes dirigidas al dominio \texttt{vitaicare.whittileaks.com} llegan a un equipo de borde distinto —otra Raspberry Pi de la misma red, que actúa como puerta de entrada—, donde corre Caddy. Este proxy inverso administra la conexión segura por HTTPS y reenvía el tráfico hacia la Raspberry Pi de la aplicación, directamente al puerto HTTP en el que esta escucha. De este modo, el equipo médico accede desde un navegador común a través de una dirección pública y cifrada, mientras que el cifrado y la exposición a Internet quedan a cargo del proxy de borde, y la Raspberry Pi de la aplicación se concentra en servir el sistema.\\
 
+
+\begin{figure}[h]
+\centering
+\includegraphics[width=0.5\textwidth]{./fotos/hardware.jpeg}
+\caption{Infraestructura de despliegue: las Raspberry Pi —entre ellas la que sirve VITAICARE y la de borde con el proxy inverso— montadas junto al router de la red local.}
+\end{figure}
 El despliegue de nuevos datos se resuelve con un único comando que ejecuta todo el ciclo: convierte el volcado SQL, lo transforma a Parquet, sincroniza los archivos con el equipo de producción y reinicia el servicio para que tome los datos nuevos. Los pasos pesados de ese ciclo se ejecutan en la PC de desarrollo, y no en la Raspberry Pi, por la restricción de memoria mencionada.\\
 
 
 \subsection{Síntesis de los desafíos técnicos}
-Varios de los problemas resueltos a lo largo de la implementación comparten un rasgo: nacieron de restricciones reales y empujaron las decisiones de diseño más interesantes del proyecto. El principal fue la \textbf{memoria del hardware de bajo costo}, que motivó todo el pipeline a Parquet. Lo siguieron las \textbf{alarmas redundantes} en condiciones sostenidas, resueltas con enfriamiento y agrupación; el \textbf{filtrado temporal a través de la medianoche}, resuelto combinando fecha y hora en un único instante con zona horaria; el \textbf{análisis sobre datos históricos}, anclado a la última fecha de cada paciente; el \textbf{costo de analizar millones de filas}, reducido con una única agrupación y cacheo; la \textbf{generación de PDF sin pantalla}; y el \textbf{acceso seguro desde fuera de la institución}, sobre datos anonimizados. En conjunto, estas soluciones son las que convirtieron a VITAICARE de un visualizador a una plataforma de monitoreo desplegada y sostenible.\\
+Varios de los problemas resueltos a lo largo de la implementación comparten un rasgo: nacieron de restricciones reales y empujaron las decisiones de diseño más interesantes del proyecto. El más exigente —y el más cercano a la mirada de la Bioingeniería— fue el \textbf{manejo temporal y de la calidad de la señal}: el filtrado por franja horaria a través de la medianoche, resuelto combinando fecha y hora en un único instante con zona horaria; la distinción entre la ausencia de datos y una señal continua, para no dibujar mediciones donde no las hubo; y el descarte de artefactos y valores atípicos antes de cualquier análisis. Le siguió en peso la \textbf{memoria del hardware de bajo costo}, que motivó todo el pipeline a Parquet. Y junto a ellos, las \textbf{alarmas redundantes} en condiciones sostenidas, resueltas con enfriamiento y agrupación; el \textbf{análisis sobre datos históricos}, anclado a la última fecha de cada paciente; el \textbf{costo de analizar millones de filas}, reducido con una única agrupación y cacheo; la \textbf{generación de PDF sin pantalla}; y el \textbf{acceso seguro desde fuera de la institución}, sobre datos anonimizados. En conjunto, estas soluciones son las que convirtieron a VITAICARE de un visualizador a una plataforma de monitoreo desplegada y sostenible.\\
 
 
 \section{Evaluación de usabilidad}
@@ -476,18 +488,19 @@ Construir una herramienta usable fue uno de los objetivos centrales de este trab
 \subsection{Enfoque y alcance}
 La evaluación siguió un enfoque de prueba de usabilidad moderada, combinando dos fuentes de información complementarias. Por un lado, la observación directa de los participantes resolviendo un conjunto de tareas representativas del uso real, con registro de su desempeño. Por otro, una medida estandarizada de la percepción global de usabilidad mediante la escala SUS (\textit{System Usability Scale}). A esto se sumaron preguntas abiertas para recoger impresiones cualitativas.\\
 
-Conviene encuadrar el alcance con honestidad. En evaluación de usabilidad se considera que con cinco a ocho participantes se detecta la mayoría de los problemas de uso; este trabajo se realizó con dos participantes, por lo que sus resultados deben leerse en clave \textbf{exploratoria y cualitativa}, como una validación preliminar, y no como una medición con valor estadístico. Aun así, la elección de los participantes no fue casual: representan los dos perfiles de usuario para los que se diseñó la herramienta, lo que permite contrastar dos miradas distintas sobre el mismo sistema.\\
+Conviene encuadrar el alcance con honestidad. En evaluación de usabilidad se considera que con cinco a ocho participantes se detecta la mayoría de los problemas de uso; este trabajo se realizó con cuatro participantes, por lo que sus resultados deben leerse en clave \textbf{exploratoria y cualitativa}, como una validación preliminar, y no como una medición con valor estadístico. Aun así, la elección de los participantes no fue casual: cubren los dos perfiles de usuario para los que se diseñó la herramienta —la mirada clínica y la del equipo de investigación—, a los que se suma la mirada del tutor del proyecto, desde el ámbito académico, lo que permite contrastar distintas miradas sobre el mismo sistema.\\
 
 
 \subsection{Participantes}
-Participaron dos personas, una por cada perfil de usuario del proyecto:\\
+Participaron cuatro personas, que cubren los dos perfiles de usuario del proyecto y suman una mirada académica:\\
 
 
 \begin{itemize}
 \item~ Una \textbf{médica de la Residencia Asturiana}, usuaria clínica final de la herramienta y responsable de las decisiones que el sistema busca apoyar.
-\item~ Una \textbf{investigadora de la Universidad de Alcalá}, con un perfil más técnico, vinculada al proyecto desde la línea de investigación en teleasistencia.
+\item~ Dos \textbf{investigadoras de la Universidad de Alcalá}, con un perfil más técnico, vinculadas al proyecto desde la línea de investigación en teleasistencia.
+\item~ El \textbf{tutor del proyecto}, docente del Instituto Tecnológico de Buenos Aires, que aportó una mirada académica y de evaluación experta sobre la herramienta.
 \end{itemize}
-Esta combinación es deliberada: la mirada clínica aporta sobre la utilidad y la pertinencia de la información, mientras que la mirada técnica aporta sobre la navegación y el funcionamiento. La participación de ambas fue voluntaria, con consentimiento informado y sobre datos anonimizados, conforme a las consideraciones éticas descritas en el Capítulo 5.\\
+Esta combinación es deliberada: la mirada clínica aporta sobre la utilidad y la pertinencia de la información, la técnica sobre la navegación y el funcionamiento, y la académica sobre la claridad y la curva de aprendizaje. La participación de los cuatro fue voluntaria, con consentimiento informado y sobre datos anonimizados, conforme a las consideraciones éticas descritas en el Capítulo 5.\\
 
 
 \subsection{Tareas}
@@ -504,10 +517,16 @@ Cada participante resolvió seis tareas, construidas a partir de las situaciones
 \end{enumerate}
 
 \subsection{Procedimiento e instrumentos de registro}
-Tras leer el consentimiento, se enunció cada tarea en voz alta. El cronómetro se iniciaba cuando la participante comenzaba a actuar y se detenía cuando daba la tarea por resuelta; si requería ayuda, la tarea se anotaba como asistida. Durante la sesión se completó una \textbf{planilla de observación} que registró, por tarea, si se completó, el tiempo empleado, la cantidad de errores o desvíos —entendidos como clics equivocados, rutas incorrectas o dificultades para encontrar un control— y observaciones cualitativas, incluyendo frases textuales de la participante.\\
+Tras leer el consentimiento, se enunció cada tarea en voz alta. El cronómetro se iniciaba cuando el participante comenzaba a actuar y se detenía cuando daba la tarea por resuelta; si requería ayuda, la tarea se anotaba como asistida. Durante la sesión se completó una \textbf{planilla de observación} que registró, por tarea, si se completó, el tiempo empleado, la cantidad de errores o desvíos —entendidos como clics equivocados, rutas incorrectas o dificultades para encontrar un control— y observaciones cualitativas, incluyendo frases textuales del participante.\\
 
-Al finalizar, cada participante respondió el \textbf{cuestionario SUS} y cuatro preguntas abiertas (qué le resultó más útil, qué le resultó confuso, qué agregaría y si lo usaría en su trabajo diario).\\
+Al finalizar, cada participante respondió el \textbf{cuestionario SUS} y cuatro preguntas abiertas (qué le resultó más útil, qué le resultó confuso, qué agregaría y si lo usaría en su trabajo diario). Las respuestas completas de los cuatro participantes se incluyen en el Anexo.\\
 
+
+\begin{figure}[h]
+\centering
+\includegraphics[width=0.45\textwidth]{./fotos/gladys_usando_app.jpeg}
+\caption{La médica de la Residencia utilizando VITAICARE en su consultorio durante la evaluación de usabilidad.}
+\end{figure}
 
 \subsection{La escala SUS y su adaptación}
 La SUS es un cuestionario estandarizado de diez afirmaciones que se responden en una escala de Likert de 1 (muy en desacuerdo) a 5 (muy de acuerdo), alternando afirmaciones positivas y negativas. Su resultado es un puntaje único de 0 a 100, comparable contra valores de referencia: el promedio histórico se ubica en torno a 68, y los valores por encima de 80 suelen considerarse excelentes.\\
@@ -549,76 +568,94 @@ En términos cuantitativos, el sistema procesa los 2.363.501 registros biométri
 
 
 \subsection{Resultados de la evaluación de usabilidad}
-La evaluación se realizó con las dos participantes descritas en el Capítulo 7. Sus resultados se presentan en tres planos: el desempeño en las tareas, el puntaje de usabilidad percibida y los hallazgos cualitativos.\\
+La evaluación se realizó con los cuatro participantes descritos en el Capítulo 7. Sus resultados se presentan en tres planos: el desempeño en las tareas, el puntaje de usabilidad percibida y los hallazgos cualitativos.\\
 
 
 \subsubsection{Desempeño en las tareas}
-Ambas participantes completaron la totalidad de las tareas sin asistencia. La Tabla 7 muestra el detalle por tarea. En conjunto, sobre doce tareas resueltas se registraron únicamente dos desvíos menores, y la mayoría de las tareas se completaron en segundos.\\
+Los cuatro participantes completaron la totalidad de las tareas sin asistencia. La Tabla 7 muestra el detalle por tarea. En conjunto, sobre veinticuatro tareas resueltas se registraron únicamente cuatro desvíos menores, y la mayoría de las tareas se completaron en segundos.\\
 
 
-\begin{table}[h!]
+\begin{table}[h]
 \centering
-\begin{tabular}{ccccc}
+\footnotesize
+\setlength{\tabcolsep}{4pt}
+\begin{tabular}{c cc cc cc cc}
 \hline
-Tarea & Médica · Tiempo & Médica · Errores & Investigadora · Tiempo & Investigadora · Errores \\
+ & \multicolumn{2}{c}{\textbf{Médica}} & \multicolumn{2}{c}{\textbf{Investig. 1}} & \multicolumn{2}{c}{\textbf{Investig. 2}} & \multicolumn{2}{c}{\textbf{Tutor}} \\
+\textbf{Tarea} & Tiempo & Err. & Tiempo & Err. & Tiempo & Err. & Tiempo & Err. \\
 \hline
-1 & 0:02 & 0 & 0:16 & 0 \\
-2 & 0:46 & 0 & 2:00 & 1 \\
-3 & 0:20 & 0 & 1:18 & 0 \\
-4 & 0:22 & 0 & 0:30 & 0 \\
-5 & 0:46 & 0 & 0:11 & 0 \\
-6 & 0:25 & 1 & 0:15 & 0 \\
+1 & 0:02 & 0 & 0:16 & 0 & 0:10 & 0 & 0:20 & 0 \\
+2 & 0:46 & 0 & 2:00 & 1 & 0:12 & 1 & 0:30 & 1 \\
+3 & 0:20 & 0 & 1:18 & 0 & 0:26 & 0 & 0:20 & 0 \\
+4 & 0:22 & 0 & 0:30 & 0 & 0:50 & 0 & 0:45 & 0 \\
+5 & 0:46 & 0 & 0:11 & 0 & 1:03 & 0 & 1:20 & 0 \\
+6 & 0:25 & 1 & 0:15 & 0 & 0:11 & 0 & 0:15 & 0 \\
 \hline
 \end{tabular}
 \caption{Desempeño por tarea (todas completadas sin asistencia). Tiempo en mm:ss.}
 \end{table}
-Los dos desvíos fueron leves y no impidieron completar la tarea. La médica, en la tarea de exportar el informe, buscó primero el control de descarga junto al gráfico antes de encontrarlo en la barra lateral. La investigadora, en la revisión semanal, realizó un clic equivocado antes de retomar la ruta correcta. Ninguno de los dos requirió ayuda.\\
+Los cuatro desvíos fueron leves y no impidieron completar la tarea. La médica, en la tarea de exportar el informe, buscó primero el control de descarga junto al gráfico antes de encontrarlo en la barra lateral. Los otros tres —las dos investigadoras y el tutor— tropezaron, en cambio, en la misma tarea de revisión semanal: realizaron un clic equivocado antes de retomar la ruta correcta, entrando primero al historial o a las alertas en lugar de seleccionar al paciente. Ninguno requirió ayuda.\\
 
 
 \subsubsection{Usabilidad percibida (SUS)}
 La Tabla 8 presenta las respuestas a la adaptación de la escala SUS y el puntaje resultante para cada participante.\\
 
 
-\begin{table}[h!]
+\begin{table}[h]
 \centering
-\begin{tabular}{clcc}
+\footnotesize
+\setlength{\tabcolsep}{4pt}
+\begin{tabular}{c l c c c c}
 \hline
-Ítem & Afirmación (resumida) & Médica & Investig. \\
+\textbf{Ítem} & \textbf{Afirmación (resumida)} & \textbf{Médica} & \textbf{Investig. 1} & \textbf{Investig. 2} & \textbf{Tutor} \\
 \hline
-1 & Usaría el sistema con frecuencia & 5 & 4 \\
-2 & Lo encontré innecesariamente complejo & 1 & 1 \\
-3 & El sistema es fácil de usar & 5 & 5 \\
-4 & Necesitaría apoyo técnico & 1 & 1 \\
-5 & Las funciones están bien integradas & 5 & 5 \\
-6 & Lo consultaría tras un evento clínico & 5 & 5 \\
-7 & La mayoría aprendería a usarlo rápido & 5 & 3 \\
-8 & Lo encontré engorroso de usar & 1 & 2 \\
-9 & Me sentí segura usándolo & 5 & 4 \\
-10 & Necesité aprender mucho antes de empezar & 4 & 1 \\
- & \textbf{Puntaje SUS} & \textbf{92,5} & \textbf{87,5} \\
+1 & Usaría el sistema con frecuencia & 5 & 4 & 5 & 5 \\
+2 & Lo encontré innecesariamente complejo & 1 & 1 & 1 & 2 \\
+3 & El sistema es fácil de usar & 5 & 5 & 5 & 4 \\
+4 & Necesitaría apoyo técnico & 1 & 1 & 1 & 4 \\
+5 & Las funciones están bien integradas & 5 & 5 & 5 & 5 \\
+6 & Lo consultaría tras un evento clínico & 5 & 5 & 5 & 5 \\
+7 & La mayoría aprendería a usarlo rápido & 5 & 3 & 5 & 4 \\
+8 & Lo encontré engorroso de usar & 1 & 2 & 1 & 2 \\
+9 & Me sentí segura usándolo & 5 & 4 & 5 & 5 \\
+10 & Necesité aprender mucho antes de empezar & 4 & 1 & 1 & 2 \\
+\hline
+\multicolumn{2}{r}{\textbf{Puntaje SUS}} & \textbf{92,5} & \textbf{87,5} & \textbf{100} & \textbf{80} \\
 \hline
 \end{tabular}
 \caption{Respuestas a la adaptación de la SUS y puntaje por participante.}
 \end{table}
-Los puntajes obtenidos fueron de 92,5 y 87,5, con un \textbf{promedio de 90,0}. Ambos valores se ubican muy por encima del promedio histórico de referencia de la escala (cercano a 68) y dentro del rango habitualmente considerado excelente. Más allá del número, las respuestas muestran un patrón coherente: el sistema se percibió como fácil de usar, bien integrado y que no requiere apoyo técnico. El punto de menor acuerdo aparece en torno a la curva de aprendizaje inicial, donde las dos participantes respondieron de manera distinta —un aspecto que se retoma a continuación.\\
+Los puntajes obtenidos fueron de 92,5, 87,5, 100 y 80, con un \textbf{promedio de 90,0}. Los cuatro valores se ubican muy por encima del promedio histórico de referencia de la escala (cercano a 68) y dentro del rango considerado entre bueno y excelente. Más allá del número, las respuestas muestran un patrón coherente: el sistema se percibió como fácil de usar y bien integrado. Los puntos de menor acuerdo aparecen en torno a la curva de aprendizaje inicial y a la necesidad de apoyo, donde la médica y el tutor se diferenciaron de las dos investigadoras —un aspecto que se retoma a continuación.\\
 
 
 \subsubsection{Hallazgos cualitativos}
-Las observaciones y las respuestas abiertas resultaron especialmente informativas, y revelaron un contraste interesante entre los dos perfiles.\\
+Las observaciones y las respuestas abiertas resultaron especialmente informativas, y revelaron un contraste interesante entre los distintos perfiles.\\
 
-En cuanto a lo \textbf{más valorado}, ambas coincidieron en la capacidad de la herramienta para volver legibles los datos: la investigadora destacó poder “ver gráficamente los datos numéricos”, y la médica subrayó que le permite chequear de forma parcial o total a los residentes y que, en algunos casos, le anticipa eventos patológicos. Las dos manifestaron que la usarían en su trabajo diario para el seguimiento de los pacientes.\\
+En cuanto a lo \textbf{más valorado}, los cuatro coincidieron en la capacidad de la herramienta para volver legibles los datos, aunque cada perfil lo expresó a su manera: las investigadoras destacaron poder ver gráficamente la información —una de ellas señaló que “poder graficar todo de forma tan rápida permite identificar problemas mucho más ágilmente”—; la médica subrayó que le permite chequear de forma parcial o total a los residentes y, en algunos casos, anticipar eventos patológicos; y el tutor valoró la cantidad de datos disponibles y la libertad de uso, al no estar encapsulados en un análisis cerrado. Todos manifestaron que la usarían en su trabajo.\\
 
-Los \textbf{puntos de fricción} difirieron según el perfil, y ahí está el hallazgo más rico. La médica señaló como confusa la calibración de algunos parámetros —puntualmente la temperatura, la frecuencia cardíaca y los pasos— y fue quien percibió una mayor curva de aprendizaje inicial. La investigadora, en cambio, no reportó dificultad de aprendizaje, pero señaló que no sabía dónde aparecerían los eventos en caso de haberlos, una observación de navegación surgida justamente al resolver una tarea sobre un paciente sin eventos registrados. Es decir, la usuaria clínica reparó en la confianza sobre los valores, mientras que la usuaria técnica reparó en la navegación de la interfaz.\\
+Los \textbf{puntos de fricción} difirieron según el perfil, y ahí está el hallazgo más rico. La médica señaló como confusa la calibración de algunos parámetros —puntualmente la temperatura, la frecuencia cardíaca y los pasos—. Las dos investigadoras, en cambio, coincidieron —de forma independiente— en un mismo punto de navegación: la comprensión del sistema de alertas; una no sabía dónde aparecerían los eventos en caso de haberlos, y la otra no tenía claro cuándo una alerta estaba activa ni a qué ventana temporal correspondía (la última semana, las últimas dos). El tutor, por su parte, apuntó a la curva de aprendizaje de los gráficos de patrón, que “requieren un tiempo de estudio”. En síntesis: la usuaria clínica reparó en la confianza sobre los valores, las usuarias técnicas en la legibilidad de las alertas y la navegación, y el tutor en la comprensión de las visualizaciones más complejas.\\
 
-Respecto de \textbf{qué cambiarían}, la investigadora no agregaría nada (“lo veo muy bien”), mientras que la médica propuso incorporar avisos activos de alerta —por ejemplo, una notificación por correo o un indicador de notificaciones en tiempo real—, una sugerencia concreta que se recoge entre las líneas de trabajo futuro.\\
+Respecto de \textbf{qué cambiarían}, una de las investigadoras no agregaría nada (“lo veo muy bien”) y la otra propuso aclarar el sistema de alertas; el tutor propuso sumar un menú de ayuda que explicara, en cada gráfico, de dónde salen los datos y qué hace cada control; y la médica propuso incorporar avisos activos de alerta —por ejemplo, una notificación por correo o un indicador de notificaciones en tiempo real—, una sugerencia concreta que se recoge entre las líneas de trabajo futuro.\\
 
-Notablemente, el punto de fricción señalado por la médica —la confianza sobre la calibración de ciertos parámetros— coincide con las limitaciones de los datos identificadas de forma independiente durante el desarrollo (Capítulo 5), en particular respecto de la presión arterial y los pasos. La interpretación de estos hallazgos, y de las diferencias entre ambos perfiles de usuario, se desarrolla en la discusión (Capítulo 9).\\
+Notablemente, el punto de fricción señalado por la médica —la confianza sobre la calibración de ciertos parámetros— coincide con las limitaciones de los datos identificadas de forma independiente durante el desarrollo (Capítulo 5), en particular respecto de la presión arterial y los pasos. La interpretación de estos hallazgos, y de las diferencias entre los distintos perfiles de usuario, se retoma en las conclusiones (Capítulo 9).\\
 
 
-\section{Discusión}
-\textit{[Pendiente de redacción.]}\\
-
+\begin{figure}[h]
+\centering
+\includegraphics[width=0.45\textwidth]{./fotos/gladys_ultimodia.jpeg}
+\caption{Cierre del trabajo de campo en la Residencia Asturiana, tras completar la evaluación de usabilidad final.}
+\end{figure}
 
 \section{Conclusión}
-\textit{[Pendiente de redacción.]}\\
+Este Proyecto Final de Carrera partió de una pregunta simple y a la vez difícil: cómo lograr que los datos biométricos de un grupo de personas mayores institucionalizadas dejaran de ser un volcado ilegible y llegaran al equipo de salud convertidos en información clara, comprensible y clínicamente útil. La respuesta tomó la forma de VITAICARE, una herramienta que empezó como un visualizador de series temporales con filtros y terminó siendo un sistema de monitoreo completo, desplegado en producción sobre hardware de bajo costo y accesible de forma remota y segura para el equipo de la Residencia Asturiana.\\
+
+Los objetivos planteados al inicio se cumplieron. Se organizó la trazabilidad de los dispositivos, vinculando cada reloj con su paciente y su período de uso; se relevaron los requerimientos junto a la médica responsable, y de allí surgieron las decisiones de diseño centrales —desde priorizar la frecuencia cardíaca hasta mirar a cada paciente respecto de su propio patrón—; se definió una arquitectura en tres capas con un pipeline reproducible que vuelve viable trabajar con más de dos millones de registros en una Raspberry Pi de 2 GB; se construyó una interfaz funcional con sus dos vistas, su sistema de alarmas, su módulo de análisis y sus informes exportables; y se evaluó su usabilidad con los dos perfiles de usuario para los que fue pensada. Lo que se había propuesto como un prototipo verificable se convirtió, en el camino, en un sistema en uso real.\\
+
+Ese resultado, sin embargo, debe leerse con la honestidad que exige el trabajo con datos clínicos. La fuente primaria es un dispositivo de consumo, y la fotopletismografía sobre la que se apoya pierde exactitud justamente en la población geriátrica —peor perfusión periférica, piel más fina, mayor prevalencia de arritmias—. Por eso, a lo largo de todo el proyecto, los datos del reloj se trataron como una señal de tendencia y de tamizaje, útil para orientar la atención del equipo de salud, y no como una medición de grado clínico. A esto se sumaron las limitaciones del propio conjunto de datos: la presión arterial llegaba desde el volcado acotada a un rango fijo —indicio de que se trataba de valores sintéticos—, el conteo de pasos no tiene precisión garantizada y varios campos de comorbilidad venían vacíos. De ahí que la presión y los pasos se visualicen pero se excluyan del análisis de patrones, y que los umbrales se hayan dejado como valores por defecto razonables, centralizados y parametrizados, a la espera de su validación clínica. Reconocer estos límites no debilita el trabajo: lo ubica con precisión en lo que es —una plataforma de visualización y soporte a la decisión— y en lo que todavía no es.\\
+
+La evaluación de usabilidad, aunque exploratoria por su número de participantes, fue especialmente reveladora. Los puntajes obtenidos en la escala SUS —92,5, 87,5, 100 y 80, con un promedio de 90— ubican a la herramienta muy por encima del valor de referencia y dentro del rango considerado entre bueno y excelente. Pero el hallazgo más rico no estuvo en el número, sino en el contraste entre las distintas miradas: la usuaria clínica reparó en la confianza sobre la calibración de ciertos parámetros, las dos usuarias técnicas en la legibilidad de las alertas y la navegación, y el tutor en la curva de aprendizaje de las visualizaciones más complejas. Que la preocupación de la médica coincidiera, sin que ella lo supiera, con las limitaciones de los datos detectadas de forma independiente durante el desarrollo —la presión y los pasos— fue una de las confirmaciones más valiosas de todo el proceso: la intuición clínica y el análisis técnico señalaron, desde lugares distintos, exactamente el mismo punto.\\
+
+Frente al estado del arte, donde la mayoría de las experiencias se detienen en la etapa de prototipo, el principal aporte de VITAICARE es haber llegado a desplegarse e integrarse en el flujo de trabajo de una residencia concreta, sobre hardware accesible y con una mirada centrada en el patrón propio de cada paciente. Quedan, naturalmente, líneas de continuidad claras: la validación clínica de los umbrales, la ingesta automática y en tiempo real de los datos —hoy procesados a partir de un volcado—, la correlación sistemática de las mediciones con eventos clínicos registrados, la incorporación de avisos activos de alerta —una notificación por correo o en tiempo real, tal como pidió la propia médica—, que, al tratarse ya de una aplicación web, podrían entregarse directamente en el navegador mediante la Web Notifications API, sin necesidad de desarrollar una aplicación dedicada; y la exploración de la escalabilidad hacia otros centros de cuidado, incluida la comparación con el centro de investigación de la Universidad de Alcalá.\\
+
+Más allá de la arquitectura, del pipeline y de los puntajes, lo que este trabajo deja es algo más difícil de medir. Empezó llevando los relojes a la Residencia para entregarlos al equipo de salud, con sus cajas apiladas sobre una mesa, y terminó viendo a la médica usar el sistema en su propio consultorio para chequear a sus residentes, rodeada de las historias clínicas de siempre. En ese recorrido, una herramienta de software dejó de ser un ejercicio académico para volverse una pequeña parte del cuidado cotidiano de personas que necesitan que alguien las mire de cerca. El sentido de la Bioingeniería lo encontré en este trabajo, justamente ahí: en tender puentes entre el dato y la persona, entre la técnica y el cuidado. Que este proyecto final de carrera haya cruzado ese puente, aunque sea modestamente y en una sola residencia, es la conclusión que da por bien empleado todo el esfuerzo.\\
 

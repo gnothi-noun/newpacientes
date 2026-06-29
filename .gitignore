@@ -10,3 +10,13 @@ memory/
 # Credenciales y secretos: nunca en git, y el deploy NO los pisa en la Pi.
 users.json
 .flask_secret
+*.aux
+*.bbl
+*.bcf
+*.blg
+*.fls
+*.out
+*.log
+*.fdb_latexmk
+*.toc
+*.run.xml

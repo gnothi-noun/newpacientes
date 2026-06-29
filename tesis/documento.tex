@@ -31,7 +31,7 @@
 \sisetup{detect-all}
 
 % ---------- Colores ----------
-\usepackage[dvipsanames]{xcolor}
+\usepackage[dvipsnames]{xcolor}
 \definecolor{light-gray}{gray}{0.94}
 \definecolor{textgray}{gray}{0.5}
 \definecolor{myviolet}{RGB}{128,0,200}
@@ -42,6 +42,10 @@
 \usepackage{float}        % para [H]
 \usepackage{subfigure}    % si preferís, cambiar por subcaption
 % \usepackage{subcaption} % alternativa moderna (si usás esta, sacá subfigure)
+
+% ---------- Captions (etiqueta "Figura X" / "Tabla X" en negrita) ----------
+\usepackage{caption}
+\captionsetup{labelfont=bf}
 
 % ---------- PDF insert ----------
 \usepackage{pdfpages}
@@ -74,6 +78,7 @@
 \lhead{Documento}
 \rhead{\leftmark}
 \cfoot{\thepage}
+\setlength{\headheight}{60pt}   % evita el warning de fancyhdr
 
 % ---------- TikZ / PGFPlots ----------
 \usepackage{tikz}
@@ -124,85 +129,149 @@
 \begin{document}
 
 % =======================
-% 1. PORTADA
+% 1. PORTADA (carátula — una sola página, sin encabezado)
 % =======================
+\thispagestyle{empty}
+\vspace*{-1.5cm}
 \begin{center}
 
-\textsc{\LARGE  Proyecto Final de Carrera }\\[0.2cm]
-\textsc{\Large Instituto Tecnológico de Buenos Aires}\\[0.5cm]
+\textsc{\LARGE Proyecto Final de Carrera}\\[0.2cm]
+\textsc{\Large Instituto Tecnológico de Buenos Aires}\\[0.4cm]
 
-\begin{figure}[H]
-\centering
-\includegraphics[scale=0.15]{logo itba.png}
-\end{figure}
+\IfFileExists{logo itba.png}{\includegraphics[scale=0.12]{logo itba.png}}{\fbox{\textsc{[logo ITBA]}}}\\[0.4cm]
 
-\FloatBarrier
-\end{center}
-\vspace{0.3cm}
-% Title
+\HRule\\[0.4cm]
+{\large\bfseries
+“Diseño e implementación de una interfaz de usuario para la visualización de datos biométricos obtenidos mediante relojes inteligentes, orientada a mejorar la toma de decisiones del equipo médico en la monitorización de personas mayores institucionalizadas.”\\[0.3cm]}
+\HRule\\[0.7cm]
 
-\begin{center}
-\HRule \\[0.4cm]
-{ \large { \bfseries   Proyecto Final de Carrera \\[0.5cm]
+{\large
 
-I\&D: Diseño e implementación de un prototipo de interfaz médica para la visualización de datos biométricos obtenidos mediante relojes inteligentes.\\
-[0.4cm] } }
- \HRule \\[1cm]
-\end{center}
+\textbf{Profesores:}\\[0.1cm]
+Giuliana \textsc{Esposito}\\
+Gaston \textsc{Corti}\\[0.4cm]
 
+\textbf{Tutor:}\\[0.1cm]
+Miguel \textsc{Aguirre}\\[0.4cm]
 
-% Author and supervisor
-{\raggedright{}
-\large
-\bf{Profesores:}
-\begin{center}
-    \begin{itemize}
-    \item \ \  Giuliana     \textsc{Esposito}\\
-    \item \ \  Gaston     \textsc{Corti}\\
-\end{itemize}
+\textbf{Co-tutor:}\\[0.1cm]
+Patricio \textsc{Whittingslow}\\[0.4cm]
 
-\end{center}
-\vspace{0.5 cm}
-\bf{Tutor:}
-\begin{center}
-    \begin{itemize}
-    \item \ \  Miguel     \textsc{Aguirre}\\
-    \end{itemize}
-\end{center}
-\bf{Co-tutor:}
-\begin{center}
-    \begin{itemize}
-    \item \ \  Patricio     \textsc{Whittingslow}\\
-    \end{itemize}
-\end{center}
-\vspace{0.5 cm}
-\bf{Alumna:}
-\begin{center}
-    \begin{itemize}
+\textbf{Alumna:}\\[0.1cm]
+Rocío \textsc{Pesoa}\\[0.5cm]
 
-     \item  \ \ Rocío    \textsc{Pesoa}\\
+\textbf{Lugar y fecha de entrega:} 29 de Junio de 2026, Buenos Aires, Argentina.
 
-\end{itemize}
-\end{center}
-\vspace{0.5 cm}
-{\bf{Lugar y fecha de entrega:} 25-06-2026,   Buenos Aires, Argentina.}
 }
-
-
+\end{center}
 \vfill
-\vspace{0.7cm}
+\clearpage
 
-
-\pagestyle{fancy}
-\headheight=60pt 	%para cambiar el tamaño del encabezado
-\fancyhead[L]	{Proyecto Final De Carrera}
-\fancyhead[R] 	{ ITBA - 2026  }
+% ---------- Encabezado para el resto del documento ----------
+\fancyhf{}
+\fancyhead[L]{Proyecto Final de Carrera}
+\fancyhead[R]{ITBA - 2026}
+\cfoot{\thepage}
 
 % =======================
-% ÍNDICE
+% RESUMEN
+% =======================
+\section*{Abstract}
+\addcontentsline{toc}{section}{Abstract}
+
+Este Proyecto Final de Carrera aborda el diseño, la implementación y la
+evaluación de un prototipo de interfaz médica para la visualización de datos
+biométricos —frecuencia cardíaca, saturación de oxígeno, temperatura y presión
+arterial— obtenidos mediante relojes inteligentes en personas mayores
+institucionalizadas de la Residencia Asturiana de Buenos Aires. El trabajo se
+enmarca en VITAICARE, una iniciativa colaborativa e interdisciplinaria entre la
+Universidad de Alcalá (España), la Residencia Asturiana y el Instituto
+Tecnológico de Buenos Aires. El problema es concreto: los datos llegan como un
+volcado crudo, ilegible para el equipo de salud. La interfaz desarrollada los
+transforma en información clara y clínicamente útil. Incluye un panel de cohorte con
+detección de alarmas, un módulo de análisis basado en la línea base personalizada
+y las tendencias de cada paciente, informes exportables y autenticación de
+usuarios. Su usabilidad se evaluó con cuatro participantes —la médica de la
+Residencia, dos investigadoras de la Universidad de Alcalá y el tutor del
+proyecto—, que completaron todas las tareas sin asistencia y otorgaron un puntaje
+SUS (System Usability Scale) promedio de 90 sobre 100. El resultado es un prototipo funcional, desplegado
+y validado en un entorno real de cuidado de personas mayores.
+
+\medskip
+\noindent\textbf{Palabras clave:} telemonitorización, dispositivos vestibles,
+visualización de datos clínicos, usabilidad, personas mayores institucionalizadas.
+
+\clearpage
+
+% =======================
+% ÍNDICE (en su propia página)
 % =======================
 \tableofcontents
-\newpage
+\clearpage
+
+% =======================
+% GLOSARIO
+% =======================
+\section*{Glosario}
+\addcontentsline{toc}{section}{Glosario}
+
+\subsection*{Siglas y abreviaturas}
+\begin{description}[font=\bfseries, leftmargin=5em, style=sameline, itemsep=1pt]
+\item[AAMI] Association for the Advancement of Medical Instrumentation.
+\item[bpm] Latidos por minuto; unidad de frecuencia cardíaca.
+\item[CSV] \emph{Comma-Separated Values}; formato de archivo tabular en texto plano.
+\item[eHealth] Salud electrónica; uso de tecnologías de la información en la atención sanitaria.
+\item[ESH] \emph{European Society of Hypertension}.
+\item[FC] Frecuencia cardíaca.
+\item[HTTP/HTTPS] Protocolos de transferencia web; HTTPS incorpora cifrado.
+\item[IEEE] \emph{Institute of Electrical and Electronics Engineers}.
+\item[IMEI] Identificador único de un dispositivo móvil.
+\item[ISO] \emph{International Organization for Standardization}.
+\item[LAN] Red de área local.
+\item[mHealth] Salud móvil; salud digital sobre dispositivos móviles.
+\item[mmHg] Milímetros de mercurio; unidad de presión arterial.
+\item[OOM] \emph{Out of Memory}; agotamiento de la memoria del sistema.
+\item[PPG] Fotopletismografía.
+\item[RAM] Memoria de acceso aleatorio.
+\item[SaO$_2$] Saturación arterial de oxígeno; medida de referencia en sangre.
+\item[SpO$_2$] Saturación de oxígeno estimada por oximetría de pulso.
+\item[SQL] Lenguaje de consulta de bases de datos relacionales.
+\item[SSH] \emph{Secure Shell}; acceso remoto cifrado a un equipo.
+\item[SUS] \emph{System Usability Scale}; cuestionario estandarizado de usabilidad.
+\item[UTC] Tiempo Universal Coordinado.
+\item[WSGI] \emph{Web Server Gateway Interface}; interfaz entre el servidor y la aplicación Python.
+\end{description}
+
+\subsection*{Términos}
+\begin{description}[font=\bfseries, leftmargin=1.5em, style=nextline, itemsep=2pt]
+\item[Agrupación de eventos] Colapso de alarmas consecutivas de una misma métrica y tipo en un único evento con su rango horario.
+\item[Anonimización] Eliminación de los datos que permitirían identificar a una persona concreta.
+\item[Artefacto] Lectura distorsionada por causas ajenas a la fisiología (movimiento, mal contacto del sensor, baja perfusión).
+\item[Banda circadiana] Rango de referencia calculado por franja horaria, que contempla la variación de los signos vitales a lo largo del día.
+\item[Caddy] Servidor web utilizado como proxy inverso, que administra el cifrado HTTPS de borde.
+\item[Cohorte] Conjunto de pacientes monitoreados, considerado en su totalidad.
+\item[Comorbilidad] Presencia de una o más enfermedades que coexisten con una condición principal en un mismo paciente.
+\item[\emph{Dashboard} (tablero)] Vista integrada que resume el estado de toda la cohorte de un vistazo.
+\item[Enfriamiento (\emph{cooldown})] Tiempo de espera tras una alarma antes de admitir otra de la misma métrica y tipo.
+\item[Fotopletismografía (PPG)] Técnica óptica que mide los cambios de volumen sanguíneo bajo la piel.
+\item[\emph{Headless}] Funcionamiento de un equipo sin pantalla ni entorno gráfico.
+\item[\emph{Hashing}] Transformación irreversible de una contraseña para almacenarla de forma segura.
+\item[Línea base personalizada] Rango usual propio de cada paciente, en lugar de un umbral genérico igual para todos.
+\item[Multimorbilidad] Coexistencia de varias enfermedades crónicas en una misma persona.
+\item[Oximetría de pulso] Método óptico no invasivo para estimar la saturación de oxígeno en sangre.
+\item[Parquet] Formato de archivo columnar comprimido, eficiente en disco y en memoria.
+\item[\emph{Pipeline} de datos] Secuencia de etapas que transforma los datos crudos hasta dejarlos listos para la aplicación.
+\item[Proxy inverso] Servidor que recibe el tráfico externo y lo reenvía a otro equipo de la red interna.
+\item[Raspberry Pi] Computadora de placa única, de bajo costo y bajo consumo.
+\item[Sin manguito (\emph{cuffless})] Dispositivo que estima la presión arterial sin un manguito inflable.
+\item[Síndromes geriátricos] Condiciones frecuentes en el adulto mayor (fragilidad, caídas, delirium, incontinencia, entre otras).
+\item[systemd] Gestor de servicios de Linux que arranca y supervisa la aplicación en producción.
+\item[Telemonitorización] Seguimiento remoto y continuo de variables de salud mediante dispositivos.
+\item[Tendencia (detección de)] Pendiente sobre los valores agregados por semana, usada como alerta temprana de deterioro sostenido.
+\item[Valores atípicos (\emph{outliers})] Lecturas que se apartan de lo plausible y que suelen corresponder a artefactos.
+\item[Dispositivo vestible (\emph{wearable})] Dispositivo electrónico que se lleva puesto y registra datos de forma continua.
+\end{description}
+\clearpage
 
 % =======================
 % CUERPO  (generado por md2latex desde tesis.md)
@@ -210,9 +279,74 @@ I\&D: Diseño e implementación de un prototipo de interfaz médica para la visu
 \input{cuerpo.tex}
 
 % =======================
-% BIBLIOGRAFÍA
+% BIBLIOGRAFÍA (en nueva página)
 % =======================
-\newpage
+\clearpage
 \printbibliography[title={Bibliografía}]
+
+% =======================
+% ANEXOS (en nueva página)
+% =======================
+\clearpage
+\section*{Anexos}
+\addcontentsline{toc}{section}{Anexos}
+
+\subsection*{Anexo A. Informes de ejemplo generados por el sistema}
+
+\noindent\textbf{Informe de cohorte (resumen de pacientes).} Es la descarga
+disponible desde la vista general del \emph{dashboard}: reúne a todos los
+pacientes con sus últimos valores y su estado, resaltando las filas en alerta.
+
+\includepdf[pages=-,pagecommand={\thispagestyle{plain}}]{./reportes/resumen_pacientes.pdf}
+
+\noindent\textbf{Informe por paciente.} Es la descarga disponible desde el
+monitor de un paciente —por ejemplo, al llegar a él para revisar una alarma—:
+incluye sus datos, una tabla de estadísticas y los eventos de alarma agrupados,
+con un gráfico alrededor de cada uno.
+
+\includepdf[pages=-,pagecommand={\thispagestyle{plain}}]{./reportes/informe_alarma.pdf}
+
+\clearpage
+\subsection*{Anexo B. Respuestas a la evaluación de usabilidad}
+
+Se incluyen las respuestas completas de las dos participantes a la evaluación de
+usabilidad descrita en el Capítulo~7 —el guion de tareas, la escala SUS y las
+preguntas abiertas—.
+
+\medskip
+\noindent\textbf{Médica de la Residencia Asturiana.}
+
+\begin{center}
+\includegraphics[width=0.82\textwidth]{./respuestas_usabilidad/g1.jpeg}\par\medskip
+\includegraphics[width=0.82\textwidth]{./respuestas_usabilidad/g2.jpeg}\par\medskip
+\includegraphics[width=0.82\textwidth]{./respuestas_usabilidad/g3.jpeg}
+\end{center}
+
+\clearpage
+\noindent\textbf{Investigadora 1 (Universidad de Alcalá).}
+
+\begin{center}
+\includegraphics[width=0.82\textwidth]{./respuestas_usabilidad/m1.jpeg}\par\medskip
+\includegraphics[width=0.82\textwidth]{./respuestas_usabilidad/m2.jpeg}\par\medskip
+\includegraphics[width=0.82\textwidth]{./respuestas_usabilidad/m3.jpeg}
+\end{center}
+
+\clearpage
+\noindent\textbf{Investigadora 2 (Universidad de Alcalá).}
+
+\begin{center}
+\includegraphics[width=0.82\textwidth]{./respuestas_usabilidad/meli1.jpeg}\par\medskip
+\includegraphics[width=0.82\textwidth]{./respuestas_usabilidad/meli2.jpeg}\par\medskip
+\includegraphics[width=0.82\textwidth]{./respuestas_usabilidad/meli3.jpeg}
+\end{center}
+
+\clearpage
+\noindent\textbf{Tutor del proyecto (Instituto Tecnológico de Buenos Aires).}
+
+\begin{center}
+\includegraphics[width=0.82\textwidth]{./respuestas_usabilidad/mi1.jpeg}\par\medskip
+\includegraphics[width=0.82\textwidth]{./respuestas_usabilidad/mi2.jpeg}\par\medskip
+\includegraphics[width=0.82\textwidth]{./respuestas_usabilidad/mi3.jpeg}
+\end{center}
 
 \end{document}
